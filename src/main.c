@@ -2,6 +2,8 @@
 #define STM32F411xE
 #include "stm32f4xx.h"
 
+#include "gpio_types.h"
+
 volatile uint8_t counter = 0;
 volatile uint32_t button_delay = 0;
 
@@ -72,22 +74,19 @@ void EXTI9_5_IRQHandler(void) {
 	}
 }
 
+void setupButton(void) {
+
+    GPIO_Button_Init(GPIOA, 10, GPIO_PULL_UP);
+    GPIO_Button_Init(GPIOB, 3, GPIO_PULL_UP);
+    GPIO_Button_Init(GPIOB, 5, GPIO_PULL_UP);
+}
+
 int main(void) {
 
 	RCC->AHB1ENR |= (RCC_AHB1ENR_GPIOAEN + RCC_AHB1ENR_GPIOBEN + RCC_AHB1ENR_GPIOCEN);
 	RCC->APB2ENR |= RCC_APB2ENR_SYSCFGEN;
 
-	GPIOA->MODER &= ~(GPIO_MODER_MODER10);
-	GPIOA->PUPDR &= ~(GPIO_PUPDR_PUPD10);
-	GPIOA->PUPDR |= (0b01 << GPIO_PUPDR_PUPD10_Pos);
-
-	GPIOB->MODER &= ~(GPIO_MODER_MODER3);
-	GPIOB->PUPDR &= ~(GPIO_PUPDR_PUPD3);
-	GPIOB->PUPDR |= (0b01 << GPIO_PUPDR_PUPD3_Pos);
-
-	GPIOB->MODER &= ~(GPIO_MODER_MODER5);
-	GPIOB->PUPDR &= ~(GPIO_PUPDR_PUPD5);
-	GPIOB->PUPDR |= (0b01 << GPIO_PUPDR_PUPD5_Pos);
+	setupButton();
 
 	GPIOC->MODER &= ~(GPIO_MODER_MODER7);
 	GPIOA->MODER &= ~(GPIO_MODER_MODER8) | (GPIO_MODER_MODER9);
@@ -122,7 +121,6 @@ int main(void) {
 	NVIC_EnableIRQ(EXTI15_10_IRQn);
 	NVIC_EnableIRQ(EXTI3_IRQn);
 	NVIC_EnableIRQ(EXTI9_5_IRQn);
-
 
 	NVIC_SetPriority(EXTI15_10_IRQn, 1);
 	NVIC_SetPriority(EXTI3_IRQn, 1);
