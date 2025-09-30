@@ -38,3 +38,4 @@ void onLED4(void)
 
     GPIOA->ODR |= GPIO_ODR_OD5;
 }
+

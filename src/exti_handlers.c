@@ -24,7 +24,7 @@ char stringOut[50];
 
 volatile uint8_t state_selections[MAX_STATES];
 const uint8_t state_max_limits[MAX_STATES] = {
-	10, 3, 10, 10, 2, 
+	9, 2, 9, 9, 2, 
 };
 
 void EXTI15_10_IRQHandler(void)
@@ -97,7 +97,7 @@ void EXTI4_IRQHandler(void)
 	{
 		if ((GPIOB->IDR & GPIO_IDR_ID4) == 0)
 		{
-
+			
 			state_selections[current_state] = counter;
 			if (current_state != 0) {
 				current_state--;
@@ -140,6 +140,9 @@ void display(uint8_t num)
 	if (pattern & 0x08)
 		GPIOA->ODR |= GPIO_ODR_OD9;
 
-	sprintf(stringOut, "Current Number = %d \n", (uint16_t)counter);
-	vdg_UART_TxString(stringOut);
+	 sprintf(stringOut, "State %d | Counter: %d (Max: %d) \n", 
+        (uint16_t)current_state, 
+        (uint16_t)counter, 
+        (uint16_t)state_max_limits[current_state]);
+    vdg_UART_TxString(stringOut);
 }

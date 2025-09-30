@@ -4,6 +4,13 @@
 #include "gpio_types.h"
 #include "setup.h"
 
+void setupFPU(void)
+{
+	SCB->CPACR |= (0b1111 << 20);
+	__asm volatile("dsb");
+	__asm volatile("isb");
+}
+
 void setUpDisplaySegment(void)
 {
 
@@ -34,7 +41,7 @@ void setupClock(void)
 {
 
 	RCC->AHB1ENR |= (RCC_AHB1ENR_GPIOAEN + RCC_AHB1ENR_GPIOBEN + RCC_AHB1ENR_GPIOCEN);
-	RCC->APB2ENR |= RCC_APB2ENR_SYSCFGEN;
+	RCC->APB2ENR |= (RCC_APB2ENR_SYSCFGEN + RCC_APB2ENR_ADC1EN);
 	RCC->APB1ENR |= RCC_APB1ENR_USART2EN;
 }
 
@@ -46,5 +53,26 @@ void setupLED(void)
 
 	GPIOA->MODER |= (MY_GPIO_MODE_OUTPUT << GPIO_MODER_MODER5_Pos) | (MY_GPIO_MODE_OUTPUT << GPIO_MODER_MODER6_Pos) | (MY_GPIO_MODE_OUTPUT << GPIO_MODER_MODER7_Pos);
 	GPIOB->MODER |= (MY_GPIO_MODE_OUTPUT << GPIO_MODER_MODER6_Pos);
-	
+}
+
+void setupAnalog(void)
+{
+
+	// Setup Temperature Sensor
+	GPIOA->MODER &= ~(GPIO_MODER_MODER0);
+	GPIOA->MODER |= (MY_GPIO_MODE_ANALOG << GPIO_MODER_MODER0_Pos);
+}
+
+void setupTemperature(void)
+{
+
+	ADC1->CR2 |= ADC_CR2_ADON;
+	ADC1->SMPR2 |= ADC_SMPR2_SMP0;
+	ADC1->SQR1 &= ~(ADC_SQR1_L);
+	ADC1->SQR1 |= (1 << ADC_SQR1_L_Pos);
+	ADC1->SQR3 &= ~(ADC_SQR3_SQ1);
+	ADC1->SQR3 |= (0 << ADC_SQR3_SQ1_Pos);
+
+	setupFPU();
+
 }

@@ -43,7 +43,7 @@ void selectButton(void)
 	EXTI->RTSR |= (1 << EXTI_RTSR_TR4_Pos);
 	EXTI->FTSR |= (1 << EXTI_FTSR_TR4_Pos);
 	SYSCFG->EXTICR[0] &= ~(SYSCFG_EXTICR2_EXTI4_Pos);
-	SYSCFG->EXTICR[0] |= (1 << SYSCFG_EXTICR2_EXTI4_Pos);
+	SYSCFG->EXTICR[1] |= (1 << SYSCFG_EXTICR2_EXTI4_Pos);
 
 	NVIC_EnableIRQ(EXTI15_10_IRQn);
 	NVIC_EnableIRQ(EXTI3_IRQn);
@@ -54,6 +54,7 @@ void selectButton(void)
 	NVIC_SetPriority(EXTI3_IRQn, 0);
 	NVIC_SetPriority(EXTI9_5_IRQn, 1);
 	NVIC_SetPriority(EXTI4_IRQn, 1);
+	
 }
 
 int main(void)
@@ -61,6 +62,7 @@ int main(void)
 
 	setupClock();
 	setupButton();
+	setupAnalog();
 	selectButton();
 
 	// /* ADC */
@@ -68,8 +70,8 @@ int main(void)
 	// __asm volatile("dsb");
 	// __asm volatile("isb");
 
-	sprintf(stringOut, "Choose Menu: \n 1. \n 2. \n");
-	vdg_UART_TxString(stringOut);
+	// sprintf(stringOut, "Choose Menu: \n 1. \n 2. \n");
+	// vdg_UART_TxString(stringOut);
 
 	// display(counter);
 
