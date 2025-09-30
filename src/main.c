@@ -3,85 +3,10 @@
 #include "stm32f4xx.h"
 #include "gpio_types.h"
 #include "exti_handlers.h"
+#include "setup.h"
 
-char stringOut[50];
-
-const uint8_t seven_seg_patterns[10] = {
-	0x00, // 0: segments pattern (masked to 4 bits)
-	0x01, // 1
-	0x02, // 2
-	0x03, // 3
-	0x04, // 4
-	0x05, // 5
-	0x06, // 6
-	0x07, // 7
-	0x08, // 8
-	0x09  // 9
-};
-
-void vdg_UART_TxString(char strOut[])
+void selectButton(void)
 {
-	for (uint8_t idx = 0; strOut[idx] != '\0'; idx++)
-	{
-		while ((USART2->SR & USART_SR_TXE) == 0)
-			;
-		USART2->DR = strOut[idx];
-	}
-}
-
-void display(uint8_t num)
-{
-	uint8_t pattern = seven_seg_patterns[num];
-
-	// Debug: Force all pins LOW first
-	GPIOC->ODR &= ~GPIO_ODR_OD7;
-	GPIOA->ODR &= ~(GPIO_ODR_OD8 | GPIO_ODR_OD9);
-	GPIOB->ODR &= ~GPIO_ODR_OD10;
-
-	// Then set according to pattern
-	if (pattern & 0x01)
-		GPIOC->ODR |= GPIO_ODR_OD7;
-	if (pattern & 0x02)
-		GPIOA->ODR |= GPIO_ODR_OD8;
-	if (pattern & 0x04)
-		GPIOB->ODR |= GPIO_ODR_OD10;
-	if (pattern & 0x08)
-		GPIOA->ODR |= GPIO_ODR_OD9;
-
-	sprintf(stringOut, "Current Number = %d \n", (uint16_t)counter);
-	vdg_UART_TxString(stringOut);
-}
-
-void setUpDisplaySegment(void)
-{
-
-	GPIOC->MODER &= ~(GPIO_MODER_MODER7);
-	GPIOA->MODER &= ~(GPIO_MODER_MODER8) | (GPIO_MODER_MODER9);
-	GPIOB->MODER &= ~(GPIO_MODER_MODER10);
-
-	GPIOC->MODER |= (MY_GPIO_MODE_OUTPUT << GPIO_MODER_MODER7_Pos);
-	GPIOA->MODER |= (MY_GPIO_MODE_OUTPUT << GPIO_MODER_MODER8_Pos) | (MY_GPIO_MODE_OUTPUT << GPIO_MODER_MODER9_Pos);
-	GPIOB->MODER |= (MY_GPIO_MODE_OUTPUT << GPIO_MODER_MODER10_Pos);
-
-	GPIOC->OTYPER &= ~GPIO_OTYPER_OT7;
-	GPIOA->OTYPER &= ~(GPIO_OTYPER_OT8 | GPIO_OTYPER_OT9);
-	GPIOB->OTYPER &= ~(GPIO_OTYPER_OT10);
-}
-
-void setupButton(void)
-{
-
-	GPIO_Button_Init(GPIOA, 10, MY_GPIO_PULL_UP);
-	GPIO_Button_Init(GPIOB, 3, MY_GPIO_PULL_UP);
-	GPIO_Button_Init(GPIOB, 5, MY_GPIO_PULL_UP);
-	GPIO_Button_Init(GPIOB, 4, MY_GPIO_PULL_UP);
-	setUpDisplaySegment();
-
-}
-
-void selectMenu(void)
-{
-
 	/* Setup GPIO PA2, PA3*/
 	GPIOA->MODER &= ~(GPIO_MODER_MODER2 | GPIO_MODER_MODER3);
 	GPIOA->MODER |= (MY_GPIO_MODE_ALTERNATIVE << GPIO_MODER_MODER2_Pos) | (MY_GPIO_MODE_ALTERNATIVE << GPIO_MODER_MODER3_Pos);
@@ -95,7 +20,7 @@ void selectMenu(void)
 	USART2->CR2 &= ~USART_CR2_STOP;
 	USART2->BRR = 139;
 	USART2->CR1 |= USART_CR1_TE | USART_CR1_RE;
- 
+
 	EXTI->IMR |= EXTI_IMR_MR10;
 	EXTI->RTSR |= (1 << EXTI_RTSR_TR10_Pos);
 	EXTI->FTSR |= (1 << EXTI_FTSR_TR10_Pos);
@@ -129,15 +54,6 @@ void selectMenu(void)
 	NVIC_SetPriority(EXTI3_IRQn, 0);
 	NVIC_SetPriority(EXTI9_5_IRQn, 1);
 	NVIC_SetPriority(EXTI4_IRQn, 1);
-
-}
-
-void setupClock(void) {
-
-	RCC->AHB1ENR |= (RCC_AHB1ENR_GPIOAEN + RCC_AHB1ENR_GPIOBEN + RCC_AHB1ENR_GPIOCEN);
-	RCC->APB2ENR |= RCC_APB2ENR_SYSCFGEN;
-	RCC->APB1ENR |= RCC_APB1ENR_USART2EN;
-
 }
 
 int main(void)
@@ -145,21 +61,21 @@ int main(void)
 
 	setupClock();
 	setupButton();
-	selectMenu();
+	selectButton();
 
-	/* ADC */
-	SCB->CPACR |= (0b1111 << 20);
-	__asm volatile("dsb");
-	__asm volatile("isb");
+	// /* ADC */
+	// SCB->CPACR |= (0b1111 << 20);
+	// __asm volatile("dsb");
+	// __asm volatile("isb");
 
 	sprintf(stringOut, "Choose Menu: \n 1. \n 2. \n");
 	vdg_UART_TxString(stringOut);
 
-	display(counter);
+	// display(counter);
 
 	while (1)
-	{	
-		for (uint32_t iter = 0; iter < 133333; iter++);
+	{
+		for (uint32_t iter = 0; iter < 133333; iter++)
+			;
 	}
-
 }

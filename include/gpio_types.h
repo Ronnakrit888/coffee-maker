@@ -43,5 +43,9 @@ typedef enum {
 } MY_Button_State_Type;
 
 void GPIO_Button_Init(GPIO_TypeDef* GPIOx, uint8_t pin_number, MY_GPIO_Pull_Type pull_config);
+void onLED1(void);
+void onLED2(void);
+void onLED3(void);
+void onLED4(void);
 
 #endif
