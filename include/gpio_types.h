@@ -1,6 +1,8 @@
 #ifndef GPIO_TYPES_H
 #define GPIO_TYPES_H
 
+#include "stm32f4xx.h"
+
 #include <stdint.h>
 
 // GPIO Pull Configuration enumuration

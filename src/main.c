@@ -1,12 +1,9 @@
 #include <stdint.h>
-#define STM32F411xE
 #include <stdio.h>
 #include "stm32f4xx.h"
-
 #include "gpio_types.h"
+#include "exti_handlers.h"
 
-volatile uint8_t counter = 0;
-volatile uint32_t button_delay = 0;
 char stringOut[50];
 
 const uint8_t seven_seg_patterns[10] = {
@@ -55,87 +52,7 @@ void display(uint8_t num)
 	vdg_UART_TxString(stringOut);
 }
 
-void EXTI15_10_IRQHandler(void)
-{
-	if ((EXTI->PR & EXTI_PR_PR10) != 0)
-	{
-		if ((GPIOA->IDR & GPIO_IDR_ID10) == 0)
-		{
-			counter++;
-			if (counter > 9)
-			{
-				counter = 0;
-			}
-			display(counter);
-		}
-
-		EXTI->PR |= EXTI_PR_PR10;
-	}
-}
-
-void EXTI3_IRQHandler(void)
-{
-	if ((EXTI->PR & EXTI_PR_PR3) != 0)
-	{
-		if ((GPIOB->IDR & GPIO_IDR_ID3) == 0)
-		{
-			if (counter == 0)
-			{
-				counter = 9;
-			}
-			else
-			{
-				counter--;
-			}
-			display(counter);
-		}
-		EXTI->PR |= EXTI_PR_PR3;
-	}
-}
-
-void EXTI9_5_IRQHandler(void)
-{
-	if ((EXTI->PR & EXTI_PR_PR5) != 0)
-	{
-		if ((GPIOB->IDR & GPIO_IDR_ID5) == 0)
-		{
-			counter = 0;
-			display(counter);
-		}
-		EXTI->PR |= EXTI_PR_PR5;
-	}
-}
-
-void EXTI4_IRQHandler(void)
-{
-	if ((EXTI->PR & EXTI_PR_PR5) != 0)
-	{
-		if ((GPIOB->IDR & GPIO_IDR_ID5) == 0)
-		{
-			counter = 0;
-			display(counter);
-		}
-		EXTI->PR |= EXTI_PR_PR5;
-	}
-}
-
-void setupButton(void)
-{
-
-	GPIO_Button_Init(GPIOA, 10, MY_GPIO_PULL_UP);
-	GPIO_Button_Init(GPIOB, 3, MY_GPIO_PULL_UP);
-	GPIO_Button_Init(GPIOB, 5, MY_GPIO_PULL_UP);
-	GPIO_Button_Init(GPIOB, 4, MY_GPIO_PULL_UP);
-}
-int main(void)
-{
-
-	RCC->AHB1ENR |= (RCC_AHB1ENR_GPIOAEN + RCC_AHB1ENR_GPIOBEN + RCC_AHB1ENR_GPIOCEN);
-	RCC->APB2ENR |= RCC_APB2ENR_SYSCFGEN;
-	RCC->APB1ENR |= RCC_APB1ENR_USART2EN;
-}
-
-void displaySegment(void)
+void setUpDisplaySegment(void)
 {
 
 	GPIOC->MODER &= ~(GPIO_MODER_MODER7);
@@ -151,13 +68,23 @@ void displaySegment(void)
 	GPIOB->OTYPER &= ~(GPIO_OTYPER_OT10);
 }
 
-uint8_t selectMenu(void)
+void setupButton(void)
 {
-	GPIOB->OTYPER &= ~(GPIO_OTYPER_OT10);
+
+	GPIO_Button_Init(GPIOA, 10, MY_GPIO_PULL_UP);
+	GPIO_Button_Init(GPIOB, 3, MY_GPIO_PULL_UP);
+	GPIO_Button_Init(GPIOB, 5, MY_GPIO_PULL_UP);
+	GPIO_Button_Init(GPIOB, 4, MY_GPIO_PULL_UP);
+	setUpDisplaySegment();
+
+}
+
+void selectMenu(void)
+{
 
 	/* Setup GPIO PA2, PA3*/
 	GPIOA->MODER &= ~(GPIO_MODER_MODER2 | GPIO_MODER_MODER3);
-	GPIOA->MODER |= (0b10 << GPIO_MODER_MODER2_Pos) | (0b10 << GPIO_MODER_MODER3_Pos);
+	GPIOA->MODER |= (MY_GPIO_MODE_ALTERNATIVE << GPIO_MODER_MODER2_Pos) | (MY_GPIO_MODE_ALTERNATIVE << GPIO_MODER_MODER3_Pos);
 
 	GPIOA->AFR[0] &= ~(GPIO_AFRL_AFRL2 | GPIO_AFRL_AFRL3);
 	GPIOA->AFR[0] |= (0b0111 << GPIO_AFRL_AFSEL2_Pos) | (0b0111 << GPIO_AFRL_AFSEL3_Pos);
@@ -168,14 +95,7 @@ uint8_t selectMenu(void)
 	USART2->CR2 &= ~USART_CR2_STOP;
 	USART2->BRR = 139;
 	USART2->CR1 |= USART_CR1_TE | USART_CR1_RE;
-
-	/* Setup PA4 PA5*/
-	GPIOA->MODER &= ~GPIO_MODER_MODER5;
-	GPIOA->MODER |= (0b01 << GPIO_MODER_MODER5_Pos);
-
-	GPIOA->MODER &= ~GPIO_MODER_MODER4;
-	GPIOA->MODER |= (0b11 << GPIO_MODER_MODER4_Pos);
-
+ 
 	EXTI->IMR |= EXTI_IMR_MR10;
 	EXTI->RTSR |= (1 << EXTI_RTSR_TR10_Pos);
 	EXTI->FTSR |= (1 << EXTI_FTSR_TR10_Pos);
@@ -199,15 +119,6 @@ uint8_t selectMenu(void)
 	EXTI->FTSR |= (1 << EXTI_FTSR_TR4_Pos);
 	SYSCFG->EXTICR[0] &= ~(SYSCFG_EXTICR2_EXTI4_Pos);
 	SYSCFG->EXTICR[0] |= (1 << SYSCFG_EXTICR2_EXTI4_Pos);
-}
-
-int main(void)
-{
-
-	RCC->AHB1ENR |= (RCC_AHB1ENR_GPIOAEN + RCC_AHB1ENR_GPIOBEN + RCC_AHB1ENR_GPIOCEN);
-	RCC->APB2ENR |= RCC_APB2ENR_SYSCFGEN;
-
-	setupButton();
 
 	NVIC_EnableIRQ(EXTI15_10_IRQn);
 	NVIC_EnableIRQ(EXTI3_IRQn);
@@ -218,6 +129,23 @@ int main(void)
 	NVIC_SetPriority(EXTI3_IRQn, 0);
 	NVIC_SetPriority(EXTI9_5_IRQn, 1);
 	NVIC_SetPriority(EXTI4_IRQn, 1);
+
+}
+
+void setupClock(void) {
+
+	RCC->AHB1ENR |= (RCC_AHB1ENR_GPIOAEN + RCC_AHB1ENR_GPIOBEN + RCC_AHB1ENR_GPIOCEN);
+	RCC->APB2ENR |= RCC_APB2ENR_SYSCFGEN;
+	RCC->APB1ENR |= RCC_APB1ENR_USART2EN;
+
+}
+
+int main(void)
+{
+
+	setupClock();
+	setupButton();
+	selectMenu();
 
 	/* ADC */
 	SCB->CPACR |= (0b1111 << 20);
@@ -230,9 +158,8 @@ int main(void)
 	display(counter);
 
 	while (1)
-	{
-
-		for (uint32_t iter = 0; iter < 133333; iter++)
-			;
+	{	
+		for (uint32_t iter = 0; iter < 133333; iter++);
 	}
+
 }
