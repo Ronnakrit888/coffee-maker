@@ -65,15 +65,12 @@ int main(void)
 	setupAnalog();
 	selectButton();
 
-	// /* ADC */
-	// SCB->CPACR |= (0b1111 << 20);
-	// __asm volatile("dsb");
-	// __asm volatile("isb");
+	// Delay to let UART stabilize
+	for (uint32_t iter = 0; iter < 1000000; iter++)
+		;
 
-	// sprintf(stringOut, "Choose Menu: \n 1. \n 2. \n");
-	// vdg_UART_TxString(stringOut);
-
-	// display(counter);
+	// Show welcome menu
+	showWelcomeMenu();
 
 	while (1)
 	{
