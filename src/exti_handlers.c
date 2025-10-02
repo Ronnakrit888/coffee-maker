@@ -17,7 +17,7 @@ const uint8_t seven_seg_patterns[10] = {
 	0x09  // 9
 };
 
-const char* menu_names[10] = {
+const char *menu_names[10] = {
 	"Espresso",
 	"Americano",
 	"Cappuccino",
@@ -27,14 +27,12 @@ const char* menu_names[10] = {
 	"Flat White",
 	"Affogato",
 	"Ristretto",
-	"Lungo"
-};
+	"Lungo"};
 
-const char* temp_types[3] = {
+const char *temp_types[3] = {
 	"Hot",
 	"Cold",
-	"Blended"
-};
+	"Blended"};
 
 volatile uint8_t counter = 0;
 volatile uint8_t current_state = 0;
@@ -43,7 +41,11 @@ char stringOut[50];
 
 volatile uint8_t state_selections[MAX_STATES];
 const uint8_t state_max_limits[MAX_STATES] = {
-	9, 2, 9, 9, 2, 
+	9,
+	2,
+	9,
+	9,
+	2,
 };
 
 void EXTI15_10_IRQHandler(void)
@@ -61,7 +63,6 @@ void EXTI15_10_IRQHandler(void)
 				counter = 0;
 			}
 			display(counter);
-
 		}
 
 		EXTI->PR |= EXTI_PR_PR10;
@@ -97,13 +98,13 @@ void EXTI9_5_IRQHandler(void)
 	{
 		if ((GPIOB->IDR & GPIO_IDR_ID5) == 0)
 		{
-			// PB5: ย้อนกลับไป state ก่อน
-			state_selections[current_state] = counter;
-			if (current_state != 0) {
-				current_state--;
-			}
 
-			counter = state_selections[current_state];
+			state_selections[current_state] = counter;
+			if (current_state < MAX_STATES - 1)
+			{
+				current_state++;
+			}
+			counter = 0;
 			display(counter);
 		}
 		EXTI->PR |= EXTI_PR_PR5;
@@ -116,12 +117,13 @@ void EXTI4_IRQHandler(void)
 	{
 		if ((GPIOB->IDR & GPIO_IDR_ID4) == 0)
 		{
-			// PB4: ยืนยัน ไป state ถัดไป
 			state_selections[current_state] = counter;
-			if (current_state < MAX_STATES - 1) {
-				current_state++;
+			if (current_state != 0)
+			{
+				current_state--;
 			}
-			counter = 0;
+
+			counter = state_selections[current_state];
 			display(counter);
 		}
 		EXTI->PR |= EXTI_PR_PR4;
@@ -144,7 +146,8 @@ void showWelcomeMenu(void)
 	vdg_UART_TxString("    COFFEE MAKER - MENU SELECTION\r\n");
 	vdg_UART_TxString("========================================\r\n");
 
-	for (uint8_t i = 0; i < 10; i++) {
+	for (uint8_t i = 0; i < 10; i++)
+	{
 		sprintf(stringOut, "%d: %s\r\n", i, menu_names[i]);
 		vdg_UART_TxString(stringOut);
 	}
@@ -153,8 +156,8 @@ void showWelcomeMenu(void)
 	vdg_UART_TxString("Controls:\r\n");
 	vdg_UART_TxString("  PA10 - Next option\r\n");
 	vdg_UART_TxString("  PB3  - Previous option\r\n");
-	vdg_UART_TxString("  PB4  - Confirm\r\n");
-	vdg_UART_TxString("  PB5  - Back\r\n");
+	vdg_UART_TxString("  PB5  - Confirm\r\n");
+	vdg_UART_TxString("  PB4  - Back\r\n");
 	vdg_UART_TxString("========================================\r\n\r\n");
 
 	display(counter);
@@ -181,23 +184,24 @@ void display(uint8_t num)
 		GPIOA->ODR |= GPIO_ODR_OD9;
 
 	// Display message based on current state
-	switch (current_state) {
-		case 0:
-			sprintf(stringOut, "[Menu Selection] %d: %s\r\n",
+	switch (current_state)
+	{
+	case 0:
+		sprintf(stringOut, "[Menu Selection] %d: %s\r\n",
 				(uint16_t)counter, menu_names[counter]);
-			break;
-		case 1:
-			sprintf(stringOut, "[Temperature] %d: %s\r\n",
+		break;
+	case 1:
+		sprintf(stringOut, "[Temperature] %d: %s\r\n",
 				(uint16_t)counter, temp_types[counter]);
-			break;
-		case 2:
-			sprintf(stringOut, "[Coffee Beans] %d beans\r\n",
+		break;
+	case 2:
+		sprintf(stringOut, "[Coffee Beans] %d beans\r\n",
 				(uint16_t)counter);
-			break;
-		default:
-			sprintf(stringOut, "State %d | Counter: %d\r\n",
+		break;
+	default:
+		sprintf(stringOut, "State %d | Counter: %d\r\n",
 				(uint16_t)current_state, (uint16_t)counter);
-			break;
+		break;
 	}
-    vdg_UART_TxString(stringOut);
+	vdg_UART_TxString(stringOut);
 }
