@@ -1,6 +1,7 @@
 #include "gpio_types.h"
 #include "exti_handlers.h"
 #include "stm32f4xx.h"
+#include "stdbool.h"
 
 void GPIO_Button_Init(GPIO_TypeDef *GPIOx, uint8_t pin_number, MY_GPIO_Pull_Type pull_config)
 {
@@ -15,27 +16,50 @@ void GPIO_Button_Init(GPIO_TypeDef *GPIOx, uint8_t pin_number, MY_GPIO_Pull_Type
     GPIOx->PUPDR |= (pull_config << (pin_number * 2));
 }
 
-void onLED1(void)
+void onLED1(bool isOn)
 {
-
-    GPIOB->ODR |= GPIO_ODR_OD6;
+    if (isOn)
+    {
+        GPIOB->ODR |= GPIO_ODR_OD6;
+    }
+    else
+    {
+        GPIOB->ODR &= ~GPIO_ODR_OD6;
+    }
 }
 
-void onLED2(void)
+void onLED2(bool isOn)
 {
-
-    GPIOA->ODR |= GPIO_ODR_OD7;
+    if (isOn)
+    {
+        GPIOA->ODR |= GPIO_ODR_OD7;
+    }
+    else
+    {
+        GPIOA->ODR &= ~GPIO_ODR_OD7;
+    }
 }
 
-void onLED3(void)
+void onLED3(bool isOn)
 {
-
-    GPIOA->ODR |= GPIO_ODR_OD6;
+    if (isOn)
+    {
+        GPIOA->ODR |= GPIO_ODR_OD6;
+    }
+    else
+    {
+        GPIOA->ODR &= ~GPIO_ODR_OD6;
+    }
 }
 
-void onLED4(void)
+void onLED4(bool isOn)
 {
-
-    GPIOA->ODR |= GPIO_ODR_OD5;
+    if (isOn)
+    {
+        GPIOA->ODR |= GPIO_ODR_OD5;
+    }
+    else
+    {
+        GPIOA->ODR &= ~GPIO_ODR_OD5;
+    }
 }
-

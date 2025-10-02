@@ -5,6 +5,7 @@
         "gpio_types.h": "c",
         "stdio.h": "c",
         "stm32f4xx.h": "c",
-        "exti_handlers.h": "c"
+        "exti_handlers.h": "c",
+        "temperature.h": "c"
     }
 }

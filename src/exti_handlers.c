@@ -3,6 +3,7 @@
 #include "stm32f4xx.h"
 #include "gpio_types.h"
 #include "exti_handlers.h"
+#include "temperature.h"
 
 const uint8_t seven_seg_patterns[10] = {
 	0x00, // 0: segments pattern (masked to 4 bits)
@@ -34,18 +35,25 @@ const char *temp_types[3] = {
 	"Cold",
 	"Blended"};
 
+const char *roast[4] = {
+	"Light Roast",
+	"Medium Roast",
+	"Medium Dark Roast",
+	"Dark Roast"};
+
 volatile uint8_t counter = 0;
 volatile uint8_t current_state = 0;
 
-char stringOut[50];
+char stringOut[100];
 
 volatile uint8_t state_selections[MAX_STATES];
 const uint8_t state_max_limits[MAX_STATES] = {
 	9,
 	2,
 	9,
-	9,
-	2,
+	3,
+	8,
+	1,
 };
 
 void EXTI15_10_IRQHandler(void)
@@ -195,13 +203,63 @@ void display(uint8_t num)
 				(uint16_t)counter, temp_types[counter]);
 		break;
 	case 2:
-		sprintf(stringOut, "[Coffee Beans] %d beans\r\n",
+		sprintf(stringOut, "[Coffee Beans] Type: %d\r\n",
 				(uint16_t)counter);
 		break;
+	case 3:
+		sprintf(stringOut, "[Roast] %s\r\n",
+				roast[counter]);
+		break;
+	case 4:
+		if (checkRoastTemperatureSafety() == 1)
+		{
+			sprintf(stringOut, "!!! SAFETY HALT !!! Temp too high for %s. Back to Menu\r\n", roast[state_selections[3]]);
+			vdg_UART_TxString(stringOut);
+			current_state = 0;
+			counter = 0;
+			display(counter);
+			return;
+		}
+		else
+		{
+			// SAFE TO PROCEED: Display the current selection for State 4 (Strength/Quantity)
+			sprintf(stringOut, "[Strength/Quantity] Shots: %d\r\n",
+					(uint16_t)counter + 1);
+		}
+		break;
+	case 5:
+	{
+		uint8_t menu_idx = state_selections[0];
+		uint8_t temp_idx = state_selections[1];
+		// state_selections[2] is bean type (no variable needed here)
+		uint8_t roast_idx = state_selections[3];
+		uint8_t shots = state_selections[4] + 1;
+
+		vdg_UART_TxString("\r\n========================================\r\n");
+		vdg_UART_TxString("         FINAL ORDER SUMMARY\r\n");
+		vdg_UART_TxString("========================================\r\n");
+		sprintf(stringOut, "DRINK: %s\r\n", menu_names[menu_idx]);
+		vdg_UART_TxString(stringOut);
+		sprintf(stringOut, "TEMP: %s\r\n", temp_types[temp_idx]);
+		vdg_UART_TxString(stringOut);
+		sprintf(stringOut, "ROAST: %s\r\n", roast[roast_idx]);
+		vdg_UART_TxString(stringOut);
+		sprintf(stringOut, "SHOTS: %d\r\n", shots);
+		vdg_UART_TxString(stringOut);
+		sprintf(stringOut, "Ready to Brew. Press CONFIRM (PB5).\r\n");
+		vdg_UART_TxString(stringOut);
+	}
+	break;
+	case 6:
+		
+		break;
 	default:
-		sprintf(stringOut, "State %d | Counter: %d\r\n",
-				(uint16_t)current_state, (uint16_t)counter);
+		sprintf(stringOut, "System Error: Unknown State\r\n");
 		break;
 	}
-	vdg_UART_TxString(stringOut);
+
+	if (current_state != 5)
+	{
+		vdg_UART_TxString(stringOut);
+	}
 }

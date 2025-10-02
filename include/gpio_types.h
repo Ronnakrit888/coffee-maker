@@ -3,7 +3,9 @@
 
 #include "stm32f4xx.h"
 
+
 #include <stdint.h>
+#include <stdbool.h>
 
 // GPIO Pull Configuration enumuration
 typedef enum {
@@ -43,9 +45,9 @@ typedef enum {
 } MY_Button_State_Type;
 
 void GPIO_Button_Init(GPIO_TypeDef* GPIOx, uint8_t pin_number, MY_GPIO_Pull_Type pull_config);
-void onLED1(void);
-void onLED2(void);
-void onLED3(void);
-void onLED4(void);
+void onLED1(bool isOn);
+void onLED2(bool isOn);
+void onLED3(bool isOn);
+void onLED4(bool isOn);
 
 #endif

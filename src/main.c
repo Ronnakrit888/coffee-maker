@@ -4,6 +4,7 @@
 #include "gpio_types.h"
 #include "exti_handlers.h"
 #include "setup.h"
+#include "temperature.h"
 
 void selectButton(void)
 {
@@ -63,10 +64,13 @@ int main(void)
 	setupClock();
 	setupButton();
 	setupAnalog();
+	setupTemperature();
+	setupLED();
+	setupOLED();
 	selectButton();
 
 	// Delay to let UART stabilize
-	for (uint32_t iter = 0; iter < 1000000; iter++)
+	for (uint32_t iter = 0; iter < 133333; iter++)
 		;
 
 	// Show welcome menu
@@ -74,7 +78,7 @@ int main(void)
 
 	while (1)
 	{
-		for (uint32_t iter = 0; iter < 133333; iter++)
-			;
+
+		for (uint32_t iter = 0; iter < 133333; iter++);
 	}
 }

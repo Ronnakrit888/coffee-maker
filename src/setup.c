@@ -74,5 +74,11 @@ void setupTemperature(void)
 	ADC1->SQR3 |= (0 << ADC_SQR3_SQ1_Pos);
 
 	setupFPU();
+}
 
+void setupOLED(void)
+{
+
+	GPIO_Button_Init(GPIOB, 6, MY_GPIO_PULL_UP);
+	GPIO_Button_Init(GPIOB, 7, MY_GPIO_PULL_UP);
 }

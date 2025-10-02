@@ -4,11 +4,11 @@
 #include <stdint.h>
 #include "stm32f4xx.h"
 
-#define MAX_STATES 5
+#define MAX_STATES 6
 
 extern volatile uint8_t counter;
 extern volatile uint8_t current_state;
-extern char stringOut[50];
+extern char stringOut[100];
 
 extern volatile uint8_t state_selections[MAX_STATES];
 extern const uint8_t state_max_limits[MAX_STATES];
