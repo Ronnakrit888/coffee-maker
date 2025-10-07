@@ -20,6 +20,7 @@ void EXTI4_IRQHandler(void);
 void display(uint8_t);
 void vdg_UART_TxString(char[]);
 void showWelcomeMenu(void);
+void showStateOptions(uint8_t state);
 
 // Bean weight management functions
 uint8_t checkBeanAvailability(uint8_t bean_idx, uint8_t shots);

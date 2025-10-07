@@ -127,6 +127,11 @@ void EXTI9_5_IRQHandler(void)
 			if (current_state < 6)
 			{
 				current_state++;
+			// Show options for the new state (1-4 only)
+			if (current_state >= 1 && current_state <= 4)
+			{
+				showStateOptions(current_state);
+			}
 			}
 			counter = 0;
 			display(counter);
@@ -145,6 +150,11 @@ void EXTI4_IRQHandler(void)
 			if (current_state != 0)
 			{
 				current_state--;
+			// Show options when going back to state 1-4
+			if (current_state >= 1 && current_state <= 4)
+			{
+				showStateOptions(current_state);
+			}
 			}
 
 			counter = state_selections[current_state];
@@ -185,6 +195,62 @@ void showWelcomeMenu(void)
 	vdg_UART_TxString("========================================\r\n\r\n");
 
 	display(counter);
+}
+
+void showStateOptions(uint8_t state)
+{
+	switch (state)
+	{
+	case 0:
+		// Already shown by showWelcomeMenu()
+		break;
+	case 1:
+		vdg_UART_TxString("\r\n========================================\r\n");
+		vdg_UART_TxString("    TEMPERATURE SELECTION\r\n");
+		vdg_UART_TxString("========================================\r\n");
+		for (uint8_t i = 0; i <= 2; i++)
+		{
+			sprintf(stringOut, "%d: %s\r\n", i, temp_types[i]);
+			vdg_UART_TxString(stringOut);
+		}
+		vdg_UART_TxString("========================================\r\n\r\n");
+		break;
+	case 2:
+		vdg_UART_TxString("\r\n========================================\r\n");
+		vdg_UART_TxString("    COFFEE BEANS SELECTION\r\n");
+		vdg_UART_TxString("========================================\r\n");
+		for (uint8_t i = 0; i <= 5; i++)
+		{
+			sprintf(stringOut, "%d: %s (%dg available)\r\n", i, bean_varieties[i], bean_weights[i]);
+			vdg_UART_TxString(stringOut);
+		}
+		vdg_UART_TxString("========================================\r\n\r\n");
+		break;
+	case 3:
+		vdg_UART_TxString("\r\n========================================\r\n");
+		vdg_UART_TxString("    ROAST LEVEL SELECTION\r\n");
+		vdg_UART_TxString("========================================\r\n");
+		for (uint8_t i = 0; i <= 3; i++)
+		{
+			sprintf(stringOut, "%d: %s\r\n", i, roast[i]);
+			vdg_UART_TxString(stringOut);
+		}
+		vdg_UART_TxString("========================================\r\n\r\n");
+		break;
+	case 4:
+		vdg_UART_TxString("\r\n========================================\r\n");
+		vdg_UART_TxString("    SHOT QUANTITY SELECTION\r\n");
+		vdg_UART_TxString("========================================\r\n");
+		for (uint8_t i = 0; i <= 8; i++)
+		{
+			sprintf(stringOut, "%d: %d shot(s) (%dg beans)\r\n", i, i + 1, 1 + i);
+			vdg_UART_TxString(stringOut);
+		}
+		vdg_UART_TxString("========================================\r\n\r\n");
+		break;
+	default:
+		break;
+	}
 }
 
 void display(uint8_t num)
@@ -271,6 +337,9 @@ void display(uint8_t num)
 		sprintf(stringOut, "AVAILABLE: %dg\r\n", bean_weights[bean_idx]);
 		vdg_UART_TxString("\r\n========================================\r\n");
 		vdg_UART_TxString(stringOut);
+
+		// Wait 2 seconds before showing result
+		for (volatile uint32_t i = 0; i < 3200000; i++);
 
 		if (checkBeanAvailability(bean_idx, shots))
 		{
