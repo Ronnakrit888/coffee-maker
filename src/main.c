@@ -5,6 +5,13 @@
 #include "exti_handlers.h"
 #include "setup.h"
 #include "temperature.h"
+#include "oled_driver.h"
+
+void delay(void)
+{
+	for (uint32_t iter = 0; iter < 133333; iter++)
+		;
+}
 
 void selectButton(void)
 {
@@ -55,7 +62,6 @@ void selectButton(void)
 	NVIC_SetPriority(EXTI3_IRQn, 0);
 	NVIC_SetPriority(EXTI9_5_IRQn, 1);
 	NVIC_SetPriority(EXTI4_IRQn, 1);
-	
 }
 
 int main(void)
@@ -70,15 +76,33 @@ int main(void)
 	selectButton();
 
 	// Delay to let UART stabilize
-	for (uint32_t iter = 0; iter < 133333; iter++)
-		;
+	delay();
 
 	// Show welcome menu
 	showWelcomeMenu();
+	OLED_Init();
 
 	while (1)
 	{
 
-		for (uint32_t iter = 0; iter < 133333; iter++);
+		OLED_Fill(1);
+		OLED_UpdateScreen();
+		delay();
+
+		// Test 2: Fill screen Black
+		OLED_Fill(0);
+		OLED_UpdateScreen();
+		delay();
+
+		// Test 3: Draw a diagonal line pattern
+		OLED_Fill(0);
+		for (uint8_t i = 0; i < 64; i++)
+		{
+			// Draw lines from top-left to bottom-right, and top-right to bottom-left
+			OLED_DrawPixel(i, i, 1);
+			OLED_DrawPixel(127 - i, i, 1);
+		}
+		OLED_UpdateScreen();
+		delay();
 	}
 }

@@ -3,6 +3,7 @@
 #include "stm32f4xx.h"
 #include "gpio_types.h"
 #include "setup.h"
+#include "oled_driver.h"
 
 void setupFPU(void)
 {
@@ -78,7 +79,12 @@ void setupTemperature(void)
 
 void setupOLED(void)
 {
+	GPIOC->MODER &= ~(GPIO_MODER_MODER6 | GPIO_MODER_MODER8);
+	GPIOC->MODER |= ((MY_GPIO_MODE_OUTPUT << GPIO_MODER_MODER6_Pos) | (MY_GPIO_MODE_OUTPUT << GPIO_MODER_MODER8_Pos));
+	GPIOC->OTYPER |= (GPIO_OTYPER_OT6 | GPIO_OTYPER_OT8);
+	GPIOC->PUPDR &= ~(GPIO_PUPDR_PUPD6 | GPIO_PUPDR_PUPD8);
+	GPIOC->PUPDR |= ((MY_GPIO_PULL_UP << GPIO_PUPDR_PUPD6_Pos) | (MY_GPIO_PULL_UP << GPIO_PUPDR_PUPD8_Pos));
 
-	GPIO_Button_Init(GPIOB, 6, MY_GPIO_PULL_UP);
-	GPIO_Button_Init(GPIOB, 7, MY_GPIO_PULL_UP);
+	OLED_SCK_SET();
+	OLED_SDA_SET();
 }
