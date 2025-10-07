@@ -35,6 +35,14 @@ const char *temp_types[3] = {
 	"Cold",
 	"Blended"};
 
+const char *bean_varieties[6] = {
+	"Arabica",
+	"Robusta",
+	"Liberica",
+	"Excelsa",
+	"Geisha",
+	"Bourbon"};
+
 const char *roast[4] = {
 	"Light Roast",
 	"Medium Roast",
@@ -50,7 +58,7 @@ volatile uint8_t state_selections[MAX_STATES];
 const uint8_t state_max_limits[MAX_STATES] = {
 	9,
 	2,
-	9,
+	5,
 	3,
 	8,
 	1,
@@ -203,8 +211,8 @@ void display(uint8_t num)
 				(uint16_t)counter, temp_types[counter]);
 		break;
 	case 2:
-		sprintf(stringOut, "[Coffee Beans] Type: %d\r\n",
-				(uint16_t)counter);
+		sprintf(stringOut, "[Coffee Beans] %d: %s\r\n",
+				(uint16_t)counter, bean_varieties[counter]);
 		break;
 	case 3:
 		sprintf(stringOut, "[Roast] %s\r\n",
@@ -231,7 +239,7 @@ void display(uint8_t num)
 	{
 		uint8_t menu_idx = state_selections[0];
 		uint8_t temp_idx = state_selections[1];
-		// state_selections[2] is bean type (no variable needed here)
+		uint8_t bean_idx = state_selections[2];
 		uint8_t roast_idx = state_selections[3];
 		uint8_t shots = state_selections[4] + 1;
 
@@ -241,6 +249,8 @@ void display(uint8_t num)
 		sprintf(stringOut, "DRINK: %s\r\n", menu_names[menu_idx]);
 		vdg_UART_TxString(stringOut);
 		sprintf(stringOut, "TEMP: %s\r\n", temp_types[temp_idx]);
+		vdg_UART_TxString(stringOut);
+		sprintf(stringOut, "BEANS: %s\r\n", bean_varieties[bean_idx]);
 		vdg_UART_TxString(stringOut);
 		sprintf(stringOut, "ROAST: %s\r\n", roast[roast_idx]);
 		vdg_UART_TxString(stringOut);
