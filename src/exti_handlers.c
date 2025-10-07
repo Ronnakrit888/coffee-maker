@@ -54,6 +54,8 @@ volatile uint8_t current_state = 0;
 
 char stringOut[100];
 
+volatile uint8_t bean_weights[6] = {5, 5, 5, 5, 5, 5};
+
 volatile uint8_t state_selections[MAX_STATES];
 const uint8_t state_max_limits[MAX_STATES] = {
 	9,
@@ -256,13 +258,69 @@ void display(uint8_t num)
 		vdg_UART_TxString(stringOut);
 		sprintf(stringOut, "SHOTS: %d\r\n", shots);
 		vdg_UART_TxString(stringOut);
-		sprintf(stringOut, "Ready to Brew. Press CONFIRM (PB5).\r\n");
+		vdg_UART_TxString("\r\n========================================\r\n");
+		uint8_t required_weight = 5 + (shots - 1);
+		sprintf(stringOut, "REQUIRED BEANS: %dg\r\n", required_weight);
 		vdg_UART_TxString(stringOut);
+		sprintf(stringOut, "AVAILABLE: %dg\r\n", bean_weights[bean_idx]);
+		vdg_UART_TxString(stringOut);
+
+		if (checkBeanAvailability(bean_idx, shots))
+		{
+			sprintf(stringOut, "Ready to Brew. Press CONFIRM (PB5).\r\n");
+			vdg_UART_TxString(stringOut);
+		}
+		else
+		{
+			sprintf(stringOut, "!!! INSUFFICIENT BEANS !!! Need %dg, Have %dg\r\n",
+					required_weight, bean_weights[bean_idx]);
+			vdg_UART_TxString(stringOut);
+			vdg_UART_TxString("Returning to menu...\r\n");
+			vdg_UART_TxString("\r========================================\r\n");
+			current_state = 0;
+			counter = 0;
+			display(counter);
+			return;
+		}
 	}
 	break;
 	case 6:
-		
-		break;
+	{
+		uint8_t bean_idx = state_selections[2];
+		uint8_t shots = state_selections[4] + 1;
+
+		// Check again before brewing
+		if (checkBeanAvailability(bean_idx, shots))
+		{
+			// Reduce bean weight
+			reduceBeanWeight(bean_idx, shots);
+
+			vdg_UART_TxString("\r\n========================================\r\n");
+			vdg_UART_TxString("        BREWING COFFEE...\r\n");
+			vdg_UART_TxString("========================================\r\n");
+			sprintf(stringOut, "Coffee brewed successfully!\r\n");
+			vdg_UART_TxString(stringOut);
+			sprintf(stringOut, "%s beans remaining: %dg\r\n",
+					bean_varieties[bean_idx], bean_weights[bean_idx]);
+			vdg_UART_TxString(stringOut);
+
+			// Display inventory
+			displayBeanWeights();
+
+			// Reset to initial state
+			current_state = 0;
+			counter = 0;
+			display(counter);
+		}
+		else
+		{
+			vdg_UART_TxString("ERROR: Not enough beans. Returning to menu.\r\n");
+			current_state = 0;
+			counter = 0;
+			display(counter);
+		}
+	}
+	break;
 	default:
 		sprintf(stringOut, "System Error: Unknown State\r\n");
 		break;
@@ -272,4 +330,46 @@ void display(uint8_t num)
 	{
 		vdg_UART_TxString(stringOut);
 	}
+}
+
+// Check if enough beans are available for the order
+// Returns 1 if available, 0 if not enough
+uint8_t checkBeanAvailability(uint8_t bean_idx, uint8_t shots)
+{
+	// Base: 5 grams, Extra: 1 gram per additional shot
+	uint8_t required_weight = 5 + (shots - 1);
+
+	if (bean_weights[bean_idx] >= required_weight)
+	{
+		return 1; // Available
+	}
+	return 0; // Not enough
+}
+
+// Reduce bean weight after making coffee
+void reduceBeanWeight(uint8_t bean_idx, uint8_t shots)
+{
+	// Base: 5 grams, Extra: 1 gram per additional shot
+	uint8_t weight_to_reduce = 5 + (shots - 1);
+
+	if (bean_weights[bean_idx] >= weight_to_reduce)
+	{
+		bean_weights[bean_idx] -= weight_to_reduce;
+	}
+}
+
+// Display current bean weights
+void displayBeanWeights(void)
+{
+	vdg_UART_TxString("\r\n========================================\r\n");
+	vdg_UART_TxString("      BEAN INVENTORY (grams)\r\n");
+	vdg_UART_TxString("========================================\r\n");
+
+	for (uint8_t i = 0; i < 6; i++)
+	{
+		sprintf(stringOut, "%s: %dg\r\n", bean_varieties[i], bean_weights[i]);
+		vdg_UART_TxString(stringOut);
+	}
+
+	vdg_UART_TxString("========================================\r\n");
 }
