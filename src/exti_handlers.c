@@ -136,11 +136,11 @@ void EXTI9_5_IRQHandler(void)
 			if (current_state < 6)
 			{
 				current_state++;
-			// Show options for the new state (1-4 only)
-			if (current_state >= 0 && current_state <= 4)
-			{
-				showStateOptions(current_state);
-			}
+				// Show options for the new state (1-4 only)
+				if (current_state >= 0 && current_state <= 4)
+				{
+					showStateOptions(current_state);
+				}
 			}
 			counter = 0;
 			display(counter);
@@ -159,18 +159,18 @@ void EXTI4_IRQHandler(void)
 			if (current_state != 0)
 			{
 				// Show going back message
-			vdg_UART_TxString("\r\n========================================\r\n");
-			sprintf(stringOut, "Going back from [%s] to [%s]\r\n",
-					state_names[current_state], state_names[current_state - 1]);
-			vdg_UART_TxString(stringOut);
-			vdg_UART_TxString("========================================\r\n");
+				vdg_UART_TxString("\r\n========================================\r\n");
+				sprintf(stringOut, "Going back from [%s] to [%s]\r\n",
+						state_names[current_state], state_names[current_state - 1]);
+				vdg_UART_TxString(stringOut);
+				vdg_UART_TxString("========================================\r\n");
 
-			current_state--;
+				current_state--;
 				// Show options when going back
-			if (current_state >= 0 && current_state <= 4)
-			{
-				showStateOptions(current_state);
-			}
+				if (current_state >= 0 && current_state <= 4)
+				{
+					showStateOptions(current_state);
+				}
 			}
 
 			counter = state_selections[current_state];
@@ -355,7 +355,8 @@ void display(uint8_t num)
 		vdg_UART_TxString("\r========================================\r\n");
 
 		// Wait 2 seconds before showing result
-		for (volatile uint32_t i = 0; i < 3200000; i++);
+		for (volatile uint32_t i = 0; i < 3200000; i++)
+			;
 
 		if (checkBeanAvailability(bean_idx, shots))
 		{
@@ -372,7 +373,8 @@ void display(uint8_t num)
 			vdg_UART_TxString("\r========================================\r\n");
 
 			// Wait 3 seconds
-			for (volatile uint32_t i = 0; i < 5000000; i++);
+			for (volatile uint32_t i = 0; i < 5000000; i++)
+				;
 
 			current_state = 0;
 			counter = 0;
@@ -492,7 +494,8 @@ void brewCoffee(void)
 		vdg_UART_TxString("Returning to menu in 3 seconds...\r\n");
 
 		// Wait 3 seconds
-		for (volatile uint32_t i = 0; i < 5000000; i++);
+		for (volatile uint32_t i = 0; i < 5000000; i++)
+			;
 
 		current_state = 0;
 		counter = 0;
@@ -513,7 +516,8 @@ void brewCoffee(void)
 		vdg_UART_TxString("Returning to menu in 3 seconds...\r\n");
 
 		// Wait 3 seconds
-		for (volatile uint32_t i = 0; i < 5000000; i++);
+		for (volatile uint32_t i = 0; i < 5000000; i++)
+			;
 
 		current_state = 0;
 		counter = 0;
@@ -534,7 +538,8 @@ void brewCoffee(void)
 		vdg_UART_TxString("Returning to menu in 3 seconds...\r\n");
 
 		// Wait 3 seconds
-		for (volatile uint32_t i = 0; i < 5000000; i++);
+		for (volatile uint32_t i = 0; i < 5000000; i++)
+			;
 
 		current_state = 0;
 		counter = 0;
@@ -555,7 +560,8 @@ void brewCoffee(void)
 		vdg_UART_TxString("Returning to menu in 3 seconds...\r\n");
 
 		// Wait 3 seconds
-		for (volatile uint32_t i = 0; i < 5000000; i++);
+		for (volatile uint32_t i = 0; i < 5000000; i++)
+			;
 
 		current_state = 0;
 		counter = 0;
@@ -576,7 +582,8 @@ void brewCoffee(void)
 		vdg_UART_TxString("Returning to menu in 3 seconds...\r\n");
 
 		// Wait 3 seconds
-		for (volatile uint32_t i = 0; i < 5000000; i++);
+		for (volatile uint32_t i = 0; i < 5000000; i++)
+			;
 
 		current_state = 0;
 		counter = 0;
@@ -631,4 +638,3 @@ void brewCoffee(void)
 	counter = 0;
 	showWelcomeMenu();
 }
-
