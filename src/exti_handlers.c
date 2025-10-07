@@ -49,6 +49,15 @@ const char *roast[4] = {
 	"Medium Dark Roast",
 	"Dark Roast"};
 
+const char *state_names[7] = {
+	"Menu Selection",
+	"Temperature Selection",
+	"Coffee Beans Selection",
+	"Roast Level Selection",
+	"Shot Quantity Selection",
+	"Final Order Summary",
+	"Brewing"};
+
 volatile uint8_t counter = 0;
 volatile uint8_t current_state = 0;
 
@@ -128,7 +137,7 @@ void EXTI9_5_IRQHandler(void)
 			{
 				current_state++;
 			// Show options for the new state (1-4 only)
-			if (current_state >= 1 && current_state <= 4)
+			if (current_state >= 0 && current_state <= 4)
 			{
 				showStateOptions(current_state);
 			}
@@ -149,9 +158,16 @@ void EXTI4_IRQHandler(void)
 			state_selections[current_state] = counter;
 			if (current_state != 0)
 			{
-				current_state--;
-			// Show options when going back to state 1-4
-			if (current_state >= 1 && current_state <= 4)
+				// Show going back message
+			vdg_UART_TxString("\r\n========================================\r\n");
+			sprintf(stringOut, "Going back from [%s] to [%s]\r\n",
+					state_names[current_state], state_names[current_state - 1]);
+			vdg_UART_TxString(stringOut);
+			vdg_UART_TxString("========================================\r\n");
+
+			current_state--;
+				// Show options when going back
+			if (current_state >= 0 && current_state <= 4)
 			{
 				showStateOptions(current_state);
 			}
@@ -202,7 +218,7 @@ void showStateOptions(uint8_t state)
 	switch (state)
 	{
 	case 0:
-		// Already shown by showWelcomeMenu()
+		showWelcomeMenu();
 		break;
 	case 1:
 		vdg_UART_TxString("\r\n========================================\r\n");
@@ -335,8 +351,8 @@ void display(uint8_t num)
 		sprintf(stringOut, "REQUIRED BEANS: %dg\r\n", required_weight);
 		vdg_UART_TxString(stringOut);
 		sprintf(stringOut, "AVAILABLE: %dg\r\n", bean_weights[bean_idx]);
-		vdg_UART_TxString("\r\n========================================\r\n");
 		vdg_UART_TxString(stringOut);
+		vdg_UART_TxString("\r========================================\r\n");
 
 		// Wait 2 seconds before showing result
 		for (volatile uint32_t i = 0; i < 3200000; i++);
@@ -352,7 +368,7 @@ void display(uint8_t num)
 					required_weight, bean_weights[bean_idx]);
 			vdg_UART_TxString(stringOut);
 			vdg_UART_TxString("\r\nReason: Not enough coffee beans to complete this order.\r\n");
-			vdg_UART_TxString("Returning to menu in 3 seconds...\r\n");
+			vdg_UART_TxString("Restart in 3 seconds...\r\n");
 			vdg_UART_TxString("\r========================================\r\n");
 
 			// Wait 3 seconds
