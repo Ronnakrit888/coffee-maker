@@ -269,6 +269,7 @@ void display(uint8_t num)
 		sprintf(stringOut, "REQUIRED BEANS: %dg\r\n", required_weight);
 		vdg_UART_TxString(stringOut);
 		sprintf(stringOut, "AVAILABLE: %dg\r\n", bean_weights[bean_idx]);
+		vdg_UART_TxString("\r\n========================================\r\n");
 		vdg_UART_TxString(stringOut);
 
 		if (checkBeanAvailability(bean_idx, shots))
@@ -281,11 +282,16 @@ void display(uint8_t num)
 			sprintf(stringOut, "!!! INSUFFICIENT BEANS !!! Need %dg, Have %dg\r\n",
 					required_weight, bean_weights[bean_idx]);
 			vdg_UART_TxString(stringOut);
-			vdg_UART_TxString("Returning to menu...\r\n");
+			vdg_UART_TxString("\r\nReason: Not enough coffee beans to complete this order.\r\n");
+			vdg_UART_TxString("Returning to menu in 3 seconds...\r\n");
 			vdg_UART_TxString("\r========================================\r\n");
+
+			// Wait 3 seconds
+			for (volatile uint32_t i = 0; i < 5000000; i++);
+
 			current_state = 0;
 			counter = 0;
-			display(counter);
+			showWelcomeMenu();
 			return;
 		}
 	}
@@ -396,12 +402,16 @@ void brewCoffee(void)
 	if (!checkBeanAvailability(bean_idx, shots))
 	{
 		vdg_UART_TxString("FAILED\r\n");
-		vdg_UART_TxString("ERROR: Insufficient beans. Returning to menu.\r\n");
+		vdg_UART_TxString("ERROR: Insufficient beans.\r\n");
+		vdg_UART_TxString("Reason: Not enough coffee beans in inventory.\r\n");
+		vdg_UART_TxString("Returning to menu in 3 seconds...\r\n");
+
+		// Wait 3 seconds
+		for (volatile uint32_t i = 0; i < 5000000; i++);
+
 		current_state = 0;
 		counter = 0;
-		for (uint16_t i = 0; i < 10000; i++)
-			;
-		display(counter);
+		showWelcomeMenu();
 		return;
 	}
 	vdg_UART_TxString("Weight pass\r\n");
@@ -412,12 +422,17 @@ void brewCoffee(void)
 	if (!checkWaterLevel())
 	{
 		vdg_UART_TxString("FAILED\r\n");
-		vdg_UART_TxString("ERROR: Insufficient water. Returning to menu.\r\n");
+		vdg_UART_TxString("ERROR: Insufficient water.\r\n");
+		sprintf(stringOut, "Reason: Water tank has %dml, need at least 250ml.\r\n", water_level);
+		vdg_UART_TxString(stringOut);
+		vdg_UART_TxString("Returning to menu in 3 seconds...\r\n");
+
+		// Wait 3 seconds
+		for (volatile uint32_t i = 0; i < 5000000; i++);
+
 		current_state = 0;
 		counter = 0;
-		for (uint16_t i = 0; i < 10000; i++)
-			;
-		display(counter);
+		showWelcomeMenu();
 		return;
 	}
 	vdg_UART_TxString("Water pass\r\n");
@@ -428,12 +443,17 @@ void brewCoffee(void)
 	if (!checkMilkLevel())
 	{
 		vdg_UART_TxString("FAILED\r\n");
-		vdg_UART_TxString("ERROR: Insufficient milk. Returning to menu.\r\n");
+		vdg_UART_TxString("ERROR: Insufficient milk.\r\n");
+		sprintf(stringOut, "Reason: Milk container has %dml, need at least 150ml.\r\n", milk_level);
+		vdg_UART_TxString(stringOut);
+		vdg_UART_TxString("Returning to menu in 3 seconds...\r\n");
+
+		// Wait 3 seconds
+		for (volatile uint32_t i = 0; i < 5000000; i++);
+
 		current_state = 0;
 		counter = 0;
-		for (uint16_t i = 0; i < 10000; i++)
-			;
-		display(counter);
+		showWelcomeMenu();
 		return;
 	}
 	vdg_UART_TxString("Milk pass\r\n");
@@ -444,12 +464,17 @@ void brewCoffee(void)
 	if (!checkBeanHumidity())
 	{
 		vdg_UART_TxString("FAILED\r\n");
-		vdg_UART_TxString("ERROR: Bean humidity not ideal. Returning to menu.\r\n");
+		vdg_UART_TxString("ERROR: Bean humidity not ideal.\r\n");
+		sprintf(stringOut, "Reason: Humidity is %d%%, ideal range is 10-15%%.\r\n", bean_humidity);
+		vdg_UART_TxString(stringOut);
+		vdg_UART_TxString("Returning to menu in 3 seconds...\r\n");
+
+		// Wait 3 seconds
+		for (volatile uint32_t i = 0; i < 5000000; i++);
+
 		current_state = 0;
 		counter = 0;
-		for (uint16_t i = 0; i < 10000; i++)
-			;
-		display(counter);
+		showWelcomeMenu();
 		return;
 	}
 	vdg_UART_TxString("Humidity pass\r\n");
@@ -460,12 +485,17 @@ void brewCoffee(void)
 	if (!checkBrewingTemperature())
 	{
 		vdg_UART_TxString("FAILED\r\n");
-		vdg_UART_TxString("ERROR: Temperature not ideal. Returning to menu.\r\n");
+		vdg_UART_TxString("ERROR: Temperature not ideal.\r\n");
+		sprintf(stringOut, "Reason: Temperature is %d°C, ideal range is 90-96°C.\r\n", brewing_temp);
+		vdg_UART_TxString(stringOut);
+		vdg_UART_TxString("Returning to menu in 3 seconds...\r\n");
+
+		// Wait 3 seconds
+		for (volatile uint32_t i = 0; i < 5000000; i++);
+
 		current_state = 0;
 		counter = 0;
-		for (uint16_t i = 0; i < 10000; i++)
-			;
-		display(counter);
+		showWelcomeMenu();
 		return;
 	}
 	vdg_UART_TxString("Temperature pass\r\n");
@@ -514,6 +544,6 @@ void brewCoffee(void)
 	// Reset to menu
 	current_state = 0;
 	counter = 0;
-	display(counter);
+	showWelcomeMenu();
 }
 
