@@ -26,4 +26,12 @@ uint8_t checkBeanAvailability(uint8_t bean_idx, uint8_t shots);
 void reduceBeanWeight(uint8_t bean_idx, uint8_t shots);
 void displayBeanWeights(void);
 
+// Brewing system checks
+uint8_t checkWaterLevel(void);
+uint8_t checkMilkLevel(void);
+uint8_t checkBeanHumidity(void);
+uint8_t checkBrewingTemperature(void);
+uint16_t calculateCaffeine(uint8_t shots);
+void brewCoffee(void);
+
 #endif
