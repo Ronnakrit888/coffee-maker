@@ -83,26 +83,35 @@ int main(void)
 	OLED_Init();
 
 	while (1)
-	{
+    {
 
-		OLED_Fill(1);
-		OLED_UpdateScreen();
-		delay();
+        char count_str[2];
 
-		// Test 2: Fill screen Black
-		OLED_Fill(0);
-		OLED_UpdateScreen();
-		delay();
+        for (int8_t count = 4; count >= 0; count--)
+        {
+            OLED_Fill(0);
 
-		// Test 3: Draw a diagonal line pattern
-		OLED_Fill(0);
-		for (uint8_t i = 0; i < 64; i++)
-		{
-			// Draw lines from top-left to bottom-right, and top-right to bottom-left
-			OLED_DrawPixel(i, i, 1);
-			OLED_DrawPixel(127 - i, i, 1);
-		}
-		OLED_UpdateScreen();
-		delay();
-	}
+			uint8_t percentage = count * 25;
+
+			OLED_DrawProgressBar(0, 56, SSD1306_WIDTH, 8, percentage);
+
+            // Convert number to string
+            snprintf(count_str, sizeof(count_str), "%d", count);
+
+            // Calculate X position to approximately center a single 8x8 digit.
+            // SSD1306_WIDTH is 128. FONT_WIDTH is 8.
+            // Center X = (128 / 2) - (8 / 2) = 64 - 4 = 60
+            uint8_t centered_x = 60;
+
+            // Line 2: The actual countdown number (Starts at y=16, which is page-aligned)
+            OLED_DrawString(centered_x, 24, count_str, 1);
+
+            OLED_UpdateScreen();
+
+            if (count > 0)
+            {
+                delay(); // Delay for 1 second
+            }
+        }
+    }
 }
