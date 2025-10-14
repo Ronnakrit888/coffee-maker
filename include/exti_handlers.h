@@ -40,4 +40,8 @@ uint16_t readPotentiometer(void);
 uint8_t getTampingLevel(uint16_t adc_value);
 const char* getTampingDescription(uint8_t level);
 
+// Light sensor functions
+float readLightIntensity(void);
+void recommendMenuByLight(void);
+
 #endif

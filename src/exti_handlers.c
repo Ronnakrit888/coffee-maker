@@ -1,5 +1,6 @@
 #include <stdint.h>
 #include <stdio.h>
+#include <math.h>
 #include "stm32f4xx.h"
 #include "gpio_types.h"
 #include "exti_handlers.h"
@@ -289,6 +290,111 @@ const char* getTampingDescription(uint8_t level)
 
 	if (level > 4) level = 4;
 	return descriptions[level];
+}
+
+// Light sensor constants
+#define VREF 3.3f
+#define ADC_MAXRES 4095.0f
+#define RX 10000.0f
+#define SLOPE -0.6875f
+#define OFFSET 5.1276f
+
+// Read light intensity from light sensor (PA1/ADC1)
+float readLightIntensity(void)
+{
+	// Configure ADC to read from channel 1 (PA1)
+	ADC1->SQR3 &= ~(ADC_SQR3_SQ1);
+	ADC1->SQR3 |= (1 << ADC_SQR3_SQ1_Pos);
+	ADC1->SQR1 &= ~(ADC_SQR1_L);
+	ADC1->SQR1 |= (1 << ADC_SQR1_L_Pos);
+	ADC1->SMPR2 |= ADC_SMPR2_SMP1;
+
+	// Start conversion
+	ADC1->CR2 |= ADC_CR2_SWSTART;
+
+	// Wait for conversion to complete
+	while ((ADC1->SR & ADC_SR_EOC) == 0)
+		;
+
+	// Read ADC value
+	uint16_t adc_raw = ADC1->DR;
+
+	// Calculate voltage
+	float adc_voltage = (adc_raw * VREF) / ADC_MAXRES;
+
+	// Calculate LDR resistance
+	float r_ldr = RX * (adc_voltage / (VREF - adc_voltage));
+
+	// Calculate light intensity using logarithmic formula
+	float log_resistance = log10(r_ldr);
+	float x = (log_resistance - OFFSET) / SLOPE;
+	float light_intensity = powf(10.0f, x);
+
+	return light_intensity;
+}
+
+// Recommend menu based on ambient light
+void recommendMenuByLight(void)
+{
+	float light_lux = readLightIntensity();
+
+	vdg_UART_TxString("\r\n========================================\r\n");
+	vdg_UART_TxString("    SMART COFFEE RECOMMENDATION\r\n");
+	vdg_UART_TxString("========================================\r\n");
+
+	sprintf(stringOut, "Light Intensity: %d Lux\r\n", (uint16_t)light_lux);
+	vdg_UART_TxString(stringOut);
+
+	if (light_lux < 50.0f)
+	{
+		vdg_UART_TxString("Time: Early Morning / Late Night\r\n");
+		vdg_UART_TxString("Recommended:\r\n");
+		vdg_UART_TxString("  - Espresso (Strong kick start)\r\n");
+		vdg_UART_TxString("  - Ristretto (Intense flavor)\r\n");
+		vdg_UART_TxString("  - Americano (Classic energy boost)\r\n");
+	}
+	else if (light_lux < 200.0f)
+	{
+		vdg_UART_TxString("Time: Morning / Evening\r\n");
+		vdg_UART_TxString("Recommended:\r\n");
+		vdg_UART_TxString("  - Cappuccino (Balanced & smooth)\r\n");
+		vdg_UART_TxString("  - Latte (Creamy comfort)\r\n");
+		vdg_UART_TxString("  - Flat White (Rich & velvety)\r\n");
+	}
+	else if (light_lux < 500.0f)
+	{
+		vdg_UART_TxString("Time: Mid-Morning / Afternoon\r\n");
+		vdg_UART_TxString("Recommended:\r\n");
+		vdg_UART_TxString("  - Mocha (Sweet & energizing)\r\n");
+		vdg_UART_TxString("  - Macchiato (Light & flavorful)\r\n");
+		vdg_UART_TxString("  - Latte (Perfect for relaxing)\r\n");
+	}
+	else if (light_lux < 1000.0f)
+	{
+		vdg_UART_TxString("Time: Bright Day\r\n");
+		vdg_UART_TxString("Recommended:\r\n");
+		vdg_UART_TxString("  - Cold Americano (Refreshing)\r\n");
+		vdg_UART_TxString("  - Iced Latte (Cool & smooth)\r\n");
+		vdg_UART_TxString("  - Cold Cappuccino (Light & fresh)\r\n");
+		vdg_UART_TxString("Tip: Consider 'Cold' temperature option!\r\n");
+	}
+	else
+	{
+		vdg_UART_TxString("Time: Very Bright / Sunny Day\r\n");
+		vdg_UART_TxString("Recommended:\r\n");
+		vdg_UART_TxString("  - Blended Coffee (Icy & refreshing)\r\n");
+		vdg_UART_TxString("  - Cold Mocha (Sweet & cool)\r\n");
+		vdg_UART_TxString("  - Affogato (Ice cream + espresso)\r\n");
+		vdg_UART_TxString("Tip: Select 'Blended' temperature!\r\n");
+	}
+
+	vdg_UART_TxString("========================================\r\n");
+	vdg_UART_TxString("Loading menu in 3 seconds...\r\n");
+	vdg_UART_TxString("========================================\r\n\r\n");
+
+	// Delay 3 seconds before showing menu
+	for (volatile uint32_t i = 0; i < 5000000; i++)
+		;
 }
 
 void showWelcomeMenu(void)

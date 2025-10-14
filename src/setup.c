@@ -114,3 +114,14 @@ void setupPotentionmeter(void)
 	NVIC_EnableIRQ(18);
 	NVIC_SetPriority(18, 0);
 }
+
+void setupLightSensor(void)
+{
+	// Setup PA1 as analog input for light sensor (ADC1 channel 1)
+	GPIOA->MODER &= ~(GPIO_MODER_MODER1);
+	GPIOA->MODER |= (0b11 << GPIO_MODER_MODER1_Pos);
+
+	// ADC configuration for light sensor
+	// Note: ADC1 is already enabled by setupPotentionmeter()
+	// We just need to configure the channel when reading
+}

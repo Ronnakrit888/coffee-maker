@@ -66,12 +66,16 @@ int main(void)
 	setupAnalog();
 	setupTemperature();
 	setupPotentionmeter();
+	setupLightSensor();
 	setupLED();
 	setupOLED();
 	selectButton();
 
 	// Delay to let UART stabilize
 	delay();
+
+	// Read ambient light and recommend menu
+	recommendMenuByLight();
 
 	// Show welcome menu
 	showWelcomeMenu();

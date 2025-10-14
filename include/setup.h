@@ -17,5 +17,6 @@ void setUpDisplaySegment(void);
 void setupTemperature(void);
 void setupOLED(void);
 void setupPotentionmeter(void);
+void setupLightSensor(void);
 
 #endif
