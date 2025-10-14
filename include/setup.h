@@ -16,5 +16,6 @@ void setupAnalog(void);
 void setUpDisplaySegment(void);
 void setupTemperature(void);
 void setupOLED(void);
+void setupPotentionmeter(void);
 
 #endif

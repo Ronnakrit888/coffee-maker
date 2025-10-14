@@ -65,6 +65,7 @@ int main(void)
 	setupButton();
 	setupAnalog();
 	setupTemperature();
+	setupPotentionmeter();
 	setupLED();
 	setupOLED();
 	selectButton();
@@ -78,35 +79,42 @@ int main(void)
 
 	while (1)
     {
+		// Start ADC conversion for potentiometer reading
+		ADC1->CR2 |= ADC_CR2_SWSTART;
 
-        char count_str[2];
-		uint8_t max_number = 4;
+		// Delay 2 seconds between conversions
+		for (volatile uint32_t iter = 0; iter < 3200000; iter++)
+			;
 
-        for (int8_t count = max_number; count >= 0; count--)
-        {
-            OLED_Fill(0);
-			
-			uint8_t percentage = (max_number - count) * 25;
+        // OLED countdown animation (commented out in original code)
+        // char count_str[2];
+		// uint8_t max_number = 4;
 
-			OLED_DrawProgressBar(0, 56, SSD1306_WIDTH, 8, percentage);
+        // for (int8_t count = max_number; count >= 0; count--)
+        // {
+        //     OLED_Fill(0);
 
-            // Convert number to string
-            snprintf(count_str, sizeof(count_str), "%d", count);
+		// 	uint8_t percentage = (max_number - count) * 25;
 
-            // Calculate X position to approximately center a single 8x8 digit.
-            // SSD1306_WIDTH is 128. FONT_WIDTH is 8.
-            // Center X = (128 / 2) - (8 / 2) = 64 - 4 = 60
-            uint8_t centered_x = 60;
+		// 	OLED_DrawProgressBar(0, 56, SSD1306_WIDTH, 8, percentage);
 
-            // Line 2: The actual countdown number (Starts at y=16, which is page-aligned)
-            OLED_DrawString(centered_x, 24, count_str, 1);
+        //     // Convert number to string
+        //     snprintf(count_str, sizeof(count_str), "%d", count);
 
-            OLED_UpdateScreen();
+        //     // Calculate X position to approximately center a single 8x8 digit.
+        //     // SSD1306_WIDTH is 128. FONT_WIDTH is 8.
+        //     // Center X = (128 / 2) - (8 / 2) = 64 - 4 = 60
+        //     uint8_t centered_x = 60;
 
-            // if (count > 0)
-            // {
-            //     delay(); // Delay for 1 second
-            // }
-        }
+        //     // Line 2: The actual countdown number (Starts at y=16, which is page-aligned)
+        //     OLED_DrawString(centered_x, 24, count_str, 1);
+
+        //     OLED_UpdateScreen();
+
+        //     // if (count > 0)
+        //     // {
+        //     //     delay(); // Delay for 1 second
+        //     // }
+        // }
     }
 }
