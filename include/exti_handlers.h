@@ -4,7 +4,7 @@
 #include <stdint.h>
 #include "stm32f4xx.h"
 
-#define MAX_STATES 6
+#define MAX_STATES 7
 
 extern volatile uint8_t counter;
 extern volatile uint8_t current_state;
@@ -34,5 +34,14 @@ uint8_t checkBeanHumidity(void);
 uint8_t checkBrewingTemperature(void);
 uint16_t calculateCaffeine(uint8_t shots);
 void brewCoffee(void);
+
+// Potentiometer and tamping functions
+uint16_t readPotentiometer(void);
+uint8_t getTampingLevel(uint16_t adc_value);
+const char* getTampingDescription(uint8_t level);
+
+// Light sensor functions
+float readLightIntensity(void);
+void recommendMenuByLight(void);
 
 #endif

@@ -7,7 +7,8 @@
 
 void delay(void)
 {
-	for (uint32_t iter = 0; iter < 133333; iter++);
+	for (uint32_t iter = 0; iter < 133333; iter++)
+		;
 }
 
 void setupFPU(void)
@@ -92,4 +93,35 @@ void setupOLED(void)
 
 	OLED_SCK_SET();
 	OLED_SDA_SET();
+}
+
+void setupPotentionmeter(void)
+{
+	GPIOA->MODER &= ~(GPIO_MODER_MODER5);
+	GPIOA->MODER |= (0b01 << GPIO_MODER_MODER5_Pos);
+	GPIOA->OTYPER &= (GPIO_OTYPER_OT5);
+	GPIOA->OSPEEDR &= (GPIO_OSPEEDR_OSPEED5);
+
+	GPIOA->MODER &= ~(GPIO_MODER_MODER4);
+	GPIOA->MODER |= (0b11 << GPIO_MODER_MODER4_Pos);
+	ADC1->CR2 |= ADC_CR2_ADON;
+	ADC1->SMPR2 |= ADC_SMPR2_SMP4;
+	ADC1->SQR1 &= ~(ADC_SQR1_L);
+	ADC1->SQR3 &= ~(ADC_SQR3_SQ1);
+	ADC1->SQR3 |= (4 << ADC_SQR3_SQ1_Pos);
+	ADC1->CR1 |= ADC_CR1_EOCIE;
+
+	NVIC_EnableIRQ(18);
+	NVIC_SetPriority(18, 0);
+}
+
+void setupLightSensor(void)
+{
+	// Setup PA1 as analog input for light sensor (ADC1 channel 1)
+	GPIOA->MODER &= ~(GPIO_MODER_MODER1);
+	GPIOA->MODER |= (0b11 << GPIO_MODER_MODER1_Pos);
+
+	// ADC configuration for light sensor
+	// Note: ADC1 is already enabled by setupPotentionmeter()
+	// We just need to configure the channel when reading
 }

@@ -65,6 +65,8 @@ int main(void)
 	setupButton();
 	setupAnalog();
 	setupTemperature();
+	setupPotentionmeter();
+	setupLightSensor();
 	setupLED();
 	setupOLED();
 	selectButton();
@@ -72,21 +74,31 @@ int main(void)
 	// Delay to let UART stabilize
 	delay();
 
+	// Read ambient light and recommend menu
+	recommendMenuByLight();
+
 	// Show welcome menu
 	showWelcomeMenu();
 	OLED_Init();
 
 	while (1)
     {
+		// Start ADC conversion for potentiometer reading
+		ADC1->CR2 |= ADC_CR2_SWSTART;
 
+		// Delay 2 seconds between conversions
+		for (volatile uint32_t iter = 0; iter < 3200000; iter++)
+			;
+
+        // OLED countdown animation (commented out in original code)
         char count_str[2];
 		uint8_t max_number = 4;
 
         for (int8_t count = max_number; count >= 0; count--)
         {
             OLED_Fill(0);
-			
-			uint8_t percentage = (max_number - count) * (100 / 4);
+
+			uint8_t percentage = (max_number - count) * (100 / max_number);
 
 			OLED_DrawProgressBar(0, 56, SSD1306_WIDTH, 8, percentage);
 

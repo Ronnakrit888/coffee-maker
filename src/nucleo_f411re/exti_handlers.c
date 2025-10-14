@@ -1,5 +1,6 @@
 #include <stdint.h>
 #include <stdio.h>
+#include <math.h>
 #include "stm32f4xx.h"
 #include "gpio_types.h"
 #include "exti_handlers.h"
@@ -51,10 +52,18 @@ const char *roast[4] = {
 	"Medium Dark Roast",
 	"Dark Roast"};
 
-const char *state_names[7] = {
+const char *tamping_levels[5] = {
+	"Very Light",
+	"Light",
+	"Medium",
+	"Strong",
+	"Very Strong"};
+
+const char *state_names[8] = {
 	"Menu Selection",
 	"Temperature Selection",
 	"Coffee Beans Selection",
+	"Tamping Level Selection",
 	"Roast Level Selection",
 	"Shot Quantity Selection",
 	"Final Order Summary",
@@ -67,6 +76,10 @@ char stringOut[100];
 
 volatile uint8_t bean_weights[6] = {5, 5, 5, 5, 5, 5};
 
+// Potentiometer ADC value
+volatile uint16_t adc_value = 0;
+volatile uint8_t adc_ready = 0;
+
 // Brewing system resources (hardcoded for testing)
 volatile uint16_t water_level = 500; // ml
 volatile uint16_t milk_level = 300;	 // ml
@@ -78,10 +91,32 @@ const uint8_t state_max_limits[MAX_STATES] = {
 	9,
 	2,
 	5,
+	4,
 	3,
 	8,
 	1,
 };
+
+// ADC interrupt handler - read potentiometer value
+void ADC_IRQHandler(void)
+{
+	if ((ADC1->SR & ADC_SR_EOC) != 0)
+	{
+		adc_value = ADC1->DR;
+		adc_ready = 1;
+
+		// Display real-time value when in tamping state
+		if (current_state == 3)
+		{
+			uint8_t tamping_level = getTampingLevel(adc_value);
+			const char* tamping_desc = getTampingDescription(tamping_level);
+
+			sprintf(stringOut, "[Tamping] ADC: %d | Level: %s | Taste: %s\r\n",
+					adc_value, tamping_levels[tamping_level], tamping_desc);
+			vdg_UART_TxString(stringOut);
+		}
+	}
+}
 
 void EXTI15_10_IRQHandler(void)
 {
@@ -133,19 +168,45 @@ void EXTI9_5_IRQHandler(void)
 	{
 		if ((GPIOB->IDR & GPIO_IDR_ID5) == 0)
 		{
+			// Special handling for tamping state (state 3)
+			if (current_state == 3)
+			{
+				// Use current ADC value to get tamping level
+				uint8_t tamping_level = getTampingLevel(adc_value);
+				state_selections[current_state] = tamping_level;
 
-			state_selections[current_state] = counter;
-			if (current_state < 6)
+				vdg_UART_TxString("\r\n========================================\r\n");
+				sprintf(stringOut, "CONFIRMED: %s - %s\r\n", tamping_levels[tamping_level], getTampingDescription(tamping_level));
+				vdg_UART_TxString(stringOut);
+				vdg_UART_TxString("========================================\r\n");
+			}
+			else
+			{
+				// Normal states use counter
+				state_selections[current_state] = counter;
+			}
+
+			if (current_state < 7)
 			{
 				current_state++;
-				// Show options for the new state (1-4 only)
-				if (current_state >= 0 && current_state <= 4)
+				// Show options for the new state (1-5 only, skip state 3 as it uses potentiometer)
+				if (current_state >= 0 && current_state <= 5 && current_state != 3)
 				{
+					showStateOptions(current_state);
+				}
+				else if (current_state == 3)
+				{
+					// For tamping state, show instructions
 					showStateOptions(current_state);
 				}
 			}
 			counter = 0;
-			display(counter);
+
+			// Don't call display for state 3, it's handled by ADC interrupt
+			if (current_state != 3)
+			{
+				display(counter);
+			}
 		}
 		EXTI->PR |= EXTI_PR_PR5;
 	}
@@ -168,8 +229,8 @@ void EXTI4_IRQHandler(void)
 				vdg_UART_TxString("========================================\r\n");
 
 				current_state--;
-				// Show options when going back
-				if (current_state >= 0 && current_state <= 4)
+				// Show options when going back (0-5)
+				if (current_state >= 0 && current_state <= 5)
 				{
 					showStateOptions(current_state);
 				}
@@ -190,6 +251,150 @@ void vdg_UART_TxString(char strOut[])
 			;
 		USART2->DR = strOut[idx];
 	}
+}
+
+// Read potentiometer value from ADC
+uint16_t readPotentiometer(void)
+{
+	// Return the latest ADC value from interrupt
+	return adc_value;
+}
+
+// Convert ADC value (0-4095) to tamping level (0-4)
+uint8_t getTampingLevel(uint16_t adc_value)
+{
+	// Divide 4096 values into 5 levels
+	// 0-819: Level 0 (Very Light)
+	// 820-1638: Level 1 (Light)
+	// 1639-2457: Level 2 (Medium)
+	// 2458-3276: Level 3 (Strong)
+	// 3277-4095: Level 4 (Very Strong)
+
+	if (adc_value < 820) return 0;
+	else if (adc_value < 1639) return 1;
+	else if (adc_value < 2458) return 2;
+	else if (adc_value < 3277) return 3;
+	else return 4;
+}
+
+// Get tamping description based on level
+const char* getTampingDescription(uint8_t level)
+{
+	const char *descriptions[5] = {
+		"Mild, Delicate, Fruity Notes",
+		"Smooth, Balanced, Light Body",
+		"Rich, Full-bodied, Balanced",
+		"Bold, Intense, Strong Flavor",
+		"Very Bold, Robust, Maximum Extraction"
+	};
+
+	if (level > 4) level = 4;
+	return descriptions[level];
+}
+
+// Light sensor constants
+#define VREF 3.3f
+#define ADC_MAXRES 4095.0f
+#define RX 10000.0f
+#define SLOPE -0.6875f
+#define OFFSET 5.1276f
+
+// Read light intensity from light sensor (PA1/ADC1)
+float readLightIntensity(void)
+{
+	// Configure ADC to read from channel 1 (PA1)
+	ADC1->SQR3 &= ~(ADC_SQR3_SQ1);
+	ADC1->SQR3 |= (1 << ADC_SQR3_SQ1_Pos);
+	ADC1->SQR1 &= ~(ADC_SQR1_L);
+	ADC1->SQR1 |= (1 << ADC_SQR1_L_Pos);
+	ADC1->SMPR2 |= ADC_SMPR2_SMP1;
+
+	// Start conversion
+	ADC1->CR2 |= ADC_CR2_SWSTART;
+
+	// Wait for conversion to complete
+	while ((ADC1->SR & ADC_SR_EOC) == 0)
+		;
+
+	// Read ADC value
+	uint16_t adc_raw = ADC1->DR;
+
+	// Calculate voltage
+	float adc_voltage = (adc_raw * VREF) / ADC_MAXRES;
+
+	// Calculate LDR resistance
+	float r_ldr = RX * (adc_voltage / (VREF - adc_voltage));
+
+	// Calculate light intensity using logarithmic formula
+	float log_resistance = log10(r_ldr);
+	float x = (log_resistance - OFFSET) / SLOPE;
+	float light_intensity = powf(10.0f, x);
+
+	return light_intensity;
+}
+
+// Recommend menu based on ambient light
+void recommendMenuByLight(void)
+{
+	float light_lux = readLightIntensity();
+
+	vdg_UART_TxString("\r\n========================================\r\n");
+	vdg_UART_TxString("    SMART COFFEE RECOMMENDATION\r\n");
+	vdg_UART_TxString("========================================\r\n");
+
+	sprintf(stringOut, "Light Intensity: %d Lux\r\n", (uint16_t)light_lux);
+	vdg_UART_TxString(stringOut);
+
+	if (light_lux < 50.0f)
+	{
+		vdg_UART_TxString("Time: Early Morning / Late Night\r\n");
+		vdg_UART_TxString("Recommended:\r\n");
+		vdg_UART_TxString("  - Espresso (Strong kick start)\r\n");
+		vdg_UART_TxString("  - Ristretto (Intense flavor)\r\n");
+		vdg_UART_TxString("  - Americano (Classic energy boost)\r\n");
+	}
+	else if (light_lux < 200.0f)
+	{
+		vdg_UART_TxString("Time: Morning / Evening\r\n");
+		vdg_UART_TxString("Recommended:\r\n");
+		vdg_UART_TxString("  - Cappuccino (Balanced & smooth)\r\n");
+		vdg_UART_TxString("  - Latte (Creamy comfort)\r\n");
+		vdg_UART_TxString("  - Flat White (Rich & velvety)\r\n");
+	}
+	else if (light_lux < 500.0f)
+	{
+		vdg_UART_TxString("Time: Mid-Morning / Afternoon\r\n");
+		vdg_UART_TxString("Recommended:\r\n");
+		vdg_UART_TxString("  - Mocha (Sweet & energizing)\r\n");
+		vdg_UART_TxString("  - Macchiato (Light & flavorful)\r\n");
+		vdg_UART_TxString("  - Latte (Perfect for relaxing)\r\n");
+	}
+	else if (light_lux < 1000.0f)
+	{
+		vdg_UART_TxString("Time: Bright Day\r\n");
+		vdg_UART_TxString("Recommended:\r\n");
+		vdg_UART_TxString("  - Cold Americano (Refreshing)\r\n");
+		vdg_UART_TxString("  - Iced Latte (Cool & smooth)\r\n");
+		vdg_UART_TxString("  - Cold Cappuccino (Light & fresh)\r\n");
+		vdg_UART_TxString("Tip: Consider 'Cold' temperature option!\r\n");
+	}
+	else
+	{
+		vdg_UART_TxString("Time: Very Bright / Sunny Day\r\n");
+		vdg_UART_TxString("Recommended:\r\n");
+		vdg_UART_TxString("  - Blended Coffee (Icy & refreshing)\r\n");
+		vdg_UART_TxString("  - Cold Mocha (Sweet & cool)\r\n");
+		vdg_UART_TxString("  - Affogato (Ice cream + espresso)\r\n");
+		vdg_UART_TxString("Tip: Select 'Blended' temperature!\r\n");
+	}
+
+	vdg_UART_TxString("========================================\r\n");
+	vdg_UART_TxString("Loading menu in 3 seconds...\r\n");
+	vdg_UART_TxString("========================================\r\n\r\n");
+
+	// Delay 3 seconds before showing menu
+	for (volatile uint32_t i = 0; i < 5000000; i++)
+		;
 }
 
 void showWelcomeMenu(void)
@@ -246,6 +451,21 @@ void showStateOptions(uint8_t state)
 		break;
 	case 3:
 		vdg_UART_TxString("\r\n========================================\r\n");
+		vdg_UART_TxString("    TAMPING LEVEL SELECTION\r\n");
+		vdg_UART_TxString("========================================\r\n");
+		vdg_UART_TxString("Rotate potentiometer to adjust tamping\r\n");
+		vdg_UART_TxString("Press PB5 to confirm your selection\r\n");
+		vdg_UART_TxString("========================================\r\n");
+		vdg_UART_TxString("Tamping Levels:\r\n");
+		for (uint8_t i = 0; i < 5; i++)
+		{
+			sprintf(stringOut, "  %d: %s\r\n", i, tamping_levels[i]);
+			vdg_UART_TxString(stringOut);
+		}
+		vdg_UART_TxString("========================================\r\n\r\n");
+		break;
+	case 4:
+		vdg_UART_TxString("\r\n========================================\r\n");
 		vdg_UART_TxString("    ROAST LEVEL SELECTION\r\n");
 		vdg_UART_TxString("========================================\r\n");
 		for (uint8_t i = 0; i <= 3; i++)
@@ -255,7 +475,7 @@ void showStateOptions(uint8_t state)
 		}
 		vdg_UART_TxString("========================================\r\n\r\n");
 		break;
-	case 4:
+	case 5:
 		vdg_UART_TxString("\r\n========================================\r\n");
 		vdg_UART_TxString("    SHOT QUANTITY SELECTION\r\n");
 		vdg_UART_TxString("========================================\r\n");
@@ -307,17 +527,27 @@ void display(uint8_t num)
 				(uint16_t)counter, bean_varieties[counter]);
 		break;
 	case 3:
+	{
+		// Tamping state - read potentiometer and display real-time
+		uint16_t adc_value = readPotentiometer();
+		uint8_t tamping_level = getTampingLevel(adc_value);
+		const char* tamping_desc = getTampingDescription(tamping_level);
+
+		sprintf(stringOut, "[Tamping] ADC: %d | Level: %s | Taste: %s\r\n",
+				adc_value, tamping_levels[tamping_level], tamping_desc);
+		break;
+	}
+	case 4:
 		sprintf(stringOut, "[Roast] %s\r\n",
 				roast[counter]);
 		break;
-	case 4:
+	case 5:
 		if (checkRoastTemperatureSafety() == 1)
 		{
-			sprintf(stringOut, "!!! SAFETY HALT !!! Temp too high for %s. Back to Menu\r\n", roast[state_selections[3]]);
+			sprintf(stringOut, "!!! SAFETY HALT !!! Temp too high for %s. Back to Menu\r\n", roast[state_selections[4]]);
 			vdg_UART_TxString(stringOut);
 
-			for (uint8_t iter = 0; iter < 10; iter++)
-			{
+			for (uint8_t count = 5; count >= 0; count--) {
 				alert_LED();
 			}
 			current_state = 0;
@@ -327,18 +557,19 @@ void display(uint8_t num)
 		}
 		else
 		{
-			// SAFE TO PROCEED: Display the current selection for State 4 (Strength/Quantity)
+			// SAFE TO PROCEED: Display the current selection for State 5 (Strength/Quantity)
 			sprintf(stringOut, "[Strength/Quantity] Shots: %d\r\n",
 					(uint16_t)counter + 1);
 		}
 		break;
-	case 5:
+	case 6:
 	{
 		uint8_t menu_idx = state_selections[0];
 		uint8_t temp_idx = state_selections[1];
 		uint8_t bean_idx = state_selections[2];
-		uint8_t roast_idx = state_selections[3];
-		uint8_t shots = state_selections[4] + 1;
+		uint8_t tamping_idx = state_selections[3];
+		uint8_t roast_idx = state_selections[4];
+		uint8_t shots = state_selections[5] + 1;
 
 		vdg_UART_TxString("\r\n========================================\r\n");
 		vdg_UART_TxString("         FINAL ORDER SUMMARY\r\n");
@@ -348,6 +579,8 @@ void display(uint8_t num)
 		sprintf(stringOut, "TEMP: %s\r\n", temp_types[temp_idx]);
 		vdg_UART_TxString(stringOut);
 		sprintf(stringOut, "BEANS: %s\r\n", bean_varieties[bean_idx]);
+		vdg_UART_TxString(stringOut);
+		sprintf(stringOut, "TAMPING: %s - %s\r\n", tamping_levels[tamping_idx], getTampingDescription(tamping_idx));
 		vdg_UART_TxString(stringOut);
 		sprintf(stringOut, "ROAST: %s\r\n", roast[roast_idx]);
 		vdg_UART_TxString(stringOut);
@@ -390,7 +623,7 @@ void display(uint8_t num)
 		}
 	}
 	break;
-	case 6:
+	case 7:
 		brewCoffee();
 		break;
 	default:
@@ -398,7 +631,7 @@ void display(uint8_t num)
 		break;
 	}
 
-	if (current_state != 5)
+	if (current_state != 6)
 	{
 		vdg_UART_TxString(stringOut);
 	}
@@ -485,7 +718,7 @@ uint16_t calculateCaffeine(uint8_t shots)
 void brewCoffee(void)
 {
 	uint8_t bean_idx = state_selections[2];
-	uint8_t shots = state_selections[4] + 1;
+	uint8_t shots = state_selections[5] + 1;
 
 	vdg_UART_TxString("\r\n========================================\r\n");
 	vdg_UART_TxString("      BREWING SYSTEM CHECKS\r\n");
