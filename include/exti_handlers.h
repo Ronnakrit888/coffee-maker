@@ -3,45 +3,20 @@
 
 #include <stdint.h>
 #include "stm32f4xx.h"
-
-#define MAX_STATES 7
-
-extern volatile uint8_t counter;
-extern volatile uint8_t current_state;
-extern char stringOut[100];
-
-extern volatile uint8_t state_selections[MAX_STATES];
-extern const uint8_t state_max_limits[MAX_STATES];
+#include "setup.h"
 
 void EXTI15_10_IRQHandler(void);
+void ADC_IRQHandler(void);
 void EXTI3_IRQHandler(void);
 void EXTI9_5_IRQHandler(void);
 void EXTI4_IRQHandler(void);
 void display(uint8_t);
 void vdg_UART_TxString(char[]);
+void recommendMenuByLight(void);
 void showWelcomeMenu(void);
 void showStateOptions(uint8_t state);
-
-// Bean weight management functions
-uint8_t checkBeanAvailability(uint8_t bean_idx, uint8_t shots);
-void reduceBeanWeight(uint8_t bean_idx, uint8_t shots);
 void displayBeanWeights(void);
-
-// Brewing system checks
-uint8_t checkWaterLevel(void);
-uint8_t checkMilkLevel(void);
-uint8_t checkBeanHumidity(void);
-uint8_t checkBrewingTemperature(void);
-uint16_t calculateCaffeine(uint8_t shots);
+uint16_t calculateCaffeine(uint8_t);
 void brewCoffee(void);
-
-// Potentiometer and tamping functions
-uint16_t readPotentiometer(void);
-uint8_t getTampingLevel(uint16_t adc_value);
-const char* getTampingDescription(uint8_t level);
-
-// Light sensor functions
-float readLightIntensity(void);
-void recommendMenuByLight(void);
 
 #endif

@@ -1,0 +1,7 @@
+{
+    "files.associations": {
+        "*.dbclient-js": "javascript",
+        "check.h": "c",
+        "state_globals.h": "c"
+    }
+}

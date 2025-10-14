@@ -4,98 +4,10 @@
 #include "stm32f4xx.h"
 #include "gpio_types.h"
 #include "exti_handlers.h"
-#include "temperature.h"
-#include "led.h"
+#include "sensor_stm32.h"
 #include "setup.h"
-
-const uint8_t seven_seg_patterns[10] = {
-	0x00, // 0: segments pattern (masked to 4 bits)
-	0x01, // 1
-	0x02, // 2
-	0x03, // 3
-	0x04, // 4
-	0x05, // 5
-	0x06, // 6
-	0x07, // 7
-	0x08, // 8
-	0x09  // 9
-};
-
-const char *menu_names[10] = {
-	"Espresso",
-	"Americano",
-	"Cappuccino",
-	"Latte",
-	"Mocha",
-	"Macchiato",
-	"Flat White",
-	"Affogato",
-	"Ristretto",
-	"Lungo"};
-
-const char *temp_types[3] = {
-	"Hot",
-	"Cold",
-	"Blended"};
-
-const char *bean_varieties[6] = {
-	"Arabica",
-	"Robusta",
-	"Liberica",
-	"Excelsa",
-	"Geisha",
-	"Bourbon"};
-
-const char *roast[4] = {
-	"Light Roast",
-	"Medium Roast",
-	"Medium Dark Roast",
-	"Dark Roast"};
-
-const char *tamping_levels[5] = {
-	"Very Light",
-	"Light",
-	"Medium",
-	"Strong",
-	"Very Strong"};
-
-const char *state_names[8] = {
-	"Menu Selection",
-	"Temperature Selection",
-	"Coffee Beans Selection",
-	"Tamping Level Selection",
-	"Roast Level Selection",
-	"Shot Quantity Selection",
-	"Final Order Summary",
-	"Brewing"};
-
-volatile uint8_t counter = 0;
-volatile uint8_t current_state = 0;
-
-char stringOut[100];
-
-volatile uint8_t bean_weights[6] = {5, 5, 5, 5, 5, 5};
-
-// Potentiometer ADC value
-volatile uint16_t adc_value = 0;
-volatile uint8_t adc_ready = 0;
-
-// Brewing system resources (hardcoded for testing)
-volatile uint16_t water_level = 500; // ml
-volatile uint16_t milk_level = 300;	 // ml
-volatile uint8_t bean_humidity = 12; // percentage (ideal: 10-15%)
-volatile uint8_t brewing_temp = 92;	 // celsius (ideal: 90-96°C)
-
-volatile uint8_t state_selections[MAX_STATES];
-const uint8_t state_max_limits[MAX_STATES] = {
-	9,
-	2,
-	5,
-	4,
-	3,
-	8,
-	1,
-};
+#include "check.h"
+#include "state_globals.h"
 
 // ADC interrupt handler - read potentiometer value
 void ADC_IRQHandler(void)
@@ -253,86 +165,6 @@ void vdg_UART_TxString(char strOut[])
 	}
 }
 
-// Read potentiometer value from ADC
-uint16_t readPotentiometer(void)
-{
-	// Return the latest ADC value from interrupt
-	return adc_value;
-}
-
-// Convert ADC value (0-4095) to tamping level (0-4)
-uint8_t getTampingLevel(uint16_t adc_value)
-{
-	// Divide 4096 values into 5 levels
-	// 0-819: Level 0 (Very Light)
-	// 820-1638: Level 1 (Light)
-	// 1639-2457: Level 2 (Medium)
-	// 2458-3276: Level 3 (Strong)
-	// 3277-4095: Level 4 (Very Strong)
-
-	if (adc_value < 820) return 0;
-	else if (adc_value < 1639) return 1;
-	else if (adc_value < 2458) return 2;
-	else if (adc_value < 3277) return 3;
-	else return 4;
-}
-
-// Get tamping description based on level
-const char* getTampingDescription(uint8_t level)
-{
-	const char *descriptions[5] = {
-		"Mild, Delicate, Fruity Notes",
-		"Smooth, Balanced, Light Body",
-		"Rich, Full-bodied, Balanced",
-		"Bold, Intense, Strong Flavor",
-		"Very Bold, Robust, Maximum Extraction"
-	};
-
-	if (level > 4) level = 4;
-	return descriptions[level];
-}
-
-// Light sensor constants
-#define VREF 3.3f
-#define ADC_MAXRES 4095.0f
-#define RX 10000.0f
-#define SLOPE -0.6875f
-#define OFFSET 5.1276f
-
-// Read light intensity from light sensor (PA1/ADC1)
-float readLightIntensity(void)
-{
-	// Configure ADC to read from channel 1 (PA1)
-	ADC1->SQR3 &= ~(ADC_SQR3_SQ1);
-	ADC1->SQR3 |= (1 << ADC_SQR3_SQ1_Pos);
-	ADC1->SQR1 &= ~(ADC_SQR1_L);
-	ADC1->SQR1 |= (1 << ADC_SQR1_L_Pos);
-	ADC1->SMPR2 |= ADC_SMPR2_SMP1;
-
-	// Start conversion
-	ADC1->CR2 |= ADC_CR2_SWSTART;
-
-	// Wait for conversion to complete
-	while ((ADC1->SR & ADC_SR_EOC) == 0)
-		;
-
-	// Read ADC value
-	uint16_t adc_raw = ADC1->DR;
-
-	// Calculate voltage
-	float adc_voltage = (adc_raw * VREF) / ADC_MAXRES;
-
-	// Calculate LDR resistance
-	float r_ldr = RX * (adc_voltage / (VREF - adc_voltage));
-
-	// Calculate light intensity using logarithmic formula
-	float log_resistance = log10(r_ldr);
-	float x = (log_resistance - OFFSET) / SLOPE;
-	float light_intensity = powf(10.0f, x);
-
-	return light_intensity;
-}
-
 // Recommend menu based on ambient light
 void recommendMenuByLight(void)
 {
@@ -392,9 +224,7 @@ void recommendMenuByLight(void)
 	vdg_UART_TxString("Loading menu in 3 seconds...\r\n");
 	vdg_UART_TxString("========================================\r\n\r\n");
 
-	// Delay 3 seconds before showing menu
-	for (volatile uint32_t i = 0; i < 5000000; i++)
-		;
+	delay(3000);
 }
 
 void showWelcomeMenu(void)
@@ -547,9 +377,6 @@ void display(uint8_t num)
 			sprintf(stringOut, "!!! SAFETY HALT !!! Temp too high for %s. Back to Menu\r\n", roast[state_selections[4]]);
 			vdg_UART_TxString(stringOut);
 
-			for (uint8_t count = 5; count >= 0; count--) {
-				alert_LED();
-			}
 			current_state = 0;
 			counter = 0;
 			display(counter);
@@ -587,16 +414,14 @@ void display(uint8_t num)
 		sprintf(stringOut, "SHOTS: %d\r\n", shots);
 		vdg_UART_TxString(stringOut);
 		vdg_UART_TxString("\r\n========================================\r\n");
-		uint8_t required_weight = 1 + (shots - 1);
+		uint8_t required_weight = BASE_BEAN_GRAMS + (shots - 1);
 		sprintf(stringOut, "REQUIRED BEANS: %dg\r\n", required_weight);
 		vdg_UART_TxString(stringOut);
 		sprintf(stringOut, "AVAILABLE: %dg\r\n", bean_weights[bean_idx]);
 		vdg_UART_TxString(stringOut);
 		vdg_UART_TxString("\r========================================\r\n");
 
-		// Wait 2 seconds before showing result
-		for (volatile uint32_t i = 0; i < 3200000; i++)
-			;
+		delay(2000);
 
 		if (checkBeanAvailability(bean_idx, shots))
 		{
@@ -612,9 +437,7 @@ void display(uint8_t num)
 			vdg_UART_TxString("Restart in 3 seconds...\r\n");
 			vdg_UART_TxString("\r========================================\r\n");
 
-			// Wait 3 seconds
-			for (volatile uint32_t i = 0; i < 5000000; i++)
-				;
+			delay(3000);
 
 			current_state = 0;
 			counter = 0;
@@ -637,32 +460,6 @@ void display(uint8_t num)
 	}
 }
 
-// Check if enough beans are available for the order
-// Returns 1 if available, 0 if not enough
-uint8_t checkBeanAvailability(uint8_t bean_idx, uint8_t shots)
-{
-	// Base: 5 grams, Extra: 1 gram per additional shot
-	uint8_t required_weight = 5 + (shots - 1);
-
-	if (bean_weights[bean_idx] >= required_weight)
-	{
-		return 1; // Available
-	}
-	return 0; // Not enough
-}
-
-// Reduce bean weight after making coffee
-void reduceBeanWeight(uint8_t bean_idx, uint8_t shots)
-{
-	// Base: 5 grams, Extra: 1 gram per additional shot
-	uint8_t weight_to_reduce = 5 + (shots - 1);
-
-	if (bean_weights[bean_idx] >= weight_to_reduce)
-	{
-		bean_weights[bean_idx] -= weight_to_reduce;
-	}
-}
-
 // Display current bean weights
 void displayBeanWeights(void)
 {
@@ -677,34 +474,6 @@ void displayBeanWeights(void)
 	}
 
 	vdg_UART_TxString("========================================\r\n");
-}
-
-// Check water level (returns 1 if sufficient, 0 if not)
-uint8_t checkWaterLevel(void)
-{
-	uint16_t required_water = 250; // ml per cup
-	return (water_level >= required_water) ? 1 : 0;
-}
-
-// Check milk level (returns 1 if sufficient, 0 if not)
-uint8_t checkMilkLevel(void)
-{
-	uint16_t required_milk = 150; // ml per cup
-	return (milk_level >= required_milk) ? 1 : 0;
-}
-
-// Check bean humidity (returns 1 if ideal, 0 if not)
-uint8_t checkBeanHumidity(void)
-{
-	// Ideal humidity: 10-15%
-	return (bean_humidity >= 10 && bean_humidity <= 15) ? 1 : 0;
-}
-
-// Check brewing temperature (returns 1 if ideal, 0 if not)
-uint8_t checkBrewingTemperature(void)
-{
-	// Ideal temperature: 90-96°C
-	return (brewing_temp >= 90 && brewing_temp <= 96) ? 1 : 0;
 }
 
 // Calculate caffeine content in mg
@@ -733,9 +502,7 @@ void brewCoffee(void)
 		vdg_UART_TxString("Reason: Not enough coffee beans in inventory.\r\n");
 		vdg_UART_TxString("Returning to menu in 3 seconds...\r\n");
 
-		// Wait 3 seconds
-		for (volatile uint32_t i = 0; i < 5000000; i++)
-			;
+		delay(3000);
 
 		current_state = 0;
 		counter = 0;
@@ -755,9 +522,7 @@ void brewCoffee(void)
 		vdg_UART_TxString(stringOut);
 		vdg_UART_TxString("Returning to menu in 3 seconds...\r\n");
 
-		// Wait 3 seconds
-		for (volatile uint32_t i = 0; i < 5000000; i++)
-			;
+		delay(3000);
 
 		current_state = 0;
 		counter = 0;
@@ -777,9 +542,7 @@ void brewCoffee(void)
 		vdg_UART_TxString(stringOut);
 		vdg_UART_TxString("Returning to menu in 3 seconds...\r\n");
 
-		// Wait 3 seconds
-		for (volatile uint32_t i = 0; i < 5000000; i++)
-			;
+		delay(3000);
 
 		current_state = 0;
 		counter = 0;
@@ -799,9 +562,7 @@ void brewCoffee(void)
 		vdg_UART_TxString(stringOut);
 		vdg_UART_TxString("Returning to menu in 3 seconds...\r\n");
 
-		// Wait 3 seconds
-		for (volatile uint32_t i = 0; i < 5000000; i++)
-			;
+		delay(3000);
 
 		current_state = 0;
 		counter = 0;
@@ -821,9 +582,7 @@ void brewCoffee(void)
 		vdg_UART_TxString(stringOut);
 		vdg_UART_TxString("Returning to menu in 3 seconds...\r\n");
 
-		// Wait 3 seconds
-		for (volatile uint32_t i = 0; i < 5000000; i++)
-			;
+		delay(3000);
 
 		current_state = 0;
 		counter = 0;
@@ -838,12 +597,10 @@ void brewCoffee(void)
 
 	// Brewing process
 	vdg_UART_TxString(">> Grinding coffee beans...\r\n");
-	for (volatile uint32_t i = 0; i < 1000000; i++)
-		; // Delay
+	delay(5000);
 
 	vdg_UART_TxString(">> Brewing coffee...\r\n");
-	for (volatile uint32_t i = 0; i < 2000000; i++)
-		; // Delay
+	delay(10000);
 
 	vdg_UART_TxString(">> Coffee brewing complete!\r\n\r\n");
 
@@ -869,9 +626,7 @@ void brewCoffee(void)
 
 	vdg_UART_TxString("\r\nReturning to menu in 5 seconds...\r\n");
 
-	// Wait 5 seconds (approximate delay)
-	for (volatile uint32_t i = 0; i < 8000000; i++)
-		;
+	delay(5000);
 
 	// Reset to menu
 	current_state = 0;

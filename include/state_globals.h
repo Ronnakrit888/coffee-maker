@@ -1,0 +1,22 @@
+#ifndef STATE_GLOBALS_H
+#define STATE_GLOBALS_H
+
+#include <stdint.h>
+
+extern volatile uint8_t counter;
+extern volatile uint8_t current_state;
+extern char stringOut[100];
+
+extern volatile uint8_t bean_weights[];
+extern volatile uint8_t current_temperature;
+extern volatile uint16_t adc_value;
+extern volatile uint8_t adc_ready;
+extern volatile uint8_t state_selections[];
+
+extern uint16_t water_level;
+extern uint16_t milk_level;
+extern uint8_t bean_humidity; 
+extern uint8_t brewing_temp; 
+
+#endif
+

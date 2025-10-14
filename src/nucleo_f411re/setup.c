@@ -5,9 +5,10 @@
 #include "setup.h"
 #include "oled_driver.h"
 
-void delay(void)
+void delay(uint32_t ms)
 {
-	for (uint32_t iter = 0; iter < 133333; iter++)
+	uint32_t threshold = ms * 133.333f;
+	for (uint32_t iter = 0; iter < threshold; iter++)
 		;
 }
 
@@ -70,6 +71,18 @@ void setupAnalog(void)
 	GPIOA->MODER |= (MY_GPIO_MODE_ANALOG << GPIO_MODER_MODER0_Pos);
 }
 
+void setupOLED(void)
+{
+	GPIOC->MODER &= ~(GPIO_MODER_MODER6 | GPIO_MODER_MODER8);
+	GPIOC->MODER |= ((MY_GPIO_MODE_OUTPUT << GPIO_MODER_MODER6_Pos) | (MY_GPIO_MODE_OUTPUT << GPIO_MODER_MODER8_Pos));
+	GPIOC->OTYPER |= (GPIO_OTYPER_OT6 | GPIO_OTYPER_OT8);
+	GPIOC->PUPDR &= ~(GPIO_PUPDR_PUPD6 | GPIO_PUPDR_PUPD8);
+	GPIOC->PUPDR |= ((MY_GPIO_PULL_UP << GPIO_PUPDR_PUPD6_Pos) | (MY_GPIO_PULL_UP << GPIO_PUPDR_PUPD8_Pos));
+
+	OLED_SCK_SET();
+	OLED_SDA_SET();
+}
+
 void setupTemperature(void)
 {
 
@@ -83,27 +96,15 @@ void setupTemperature(void)
 	setupFPU();
 }
 
-void setupOLED(void)
-{
-	GPIOC->MODER &= ~(GPIO_MODER_MODER6 | GPIO_MODER_MODER8);
-	GPIOC->MODER |= ((MY_GPIO_MODE_OUTPUT << GPIO_MODER_MODER6_Pos) | (MY_GPIO_MODE_OUTPUT << GPIO_MODER_MODER8_Pos));
-	GPIOC->OTYPER |= (GPIO_OTYPER_OT6 | GPIO_OTYPER_OT8);
-	GPIOC->PUPDR &= ~(GPIO_PUPDR_PUPD6 | GPIO_PUPDR_PUPD8);
-	GPIOC->PUPDR |= ((MY_GPIO_PULL_UP << GPIO_PUPDR_PUPD6_Pos) | (MY_GPIO_PULL_UP << GPIO_PUPDR_PUPD8_Pos));
-
-	OLED_SCK_SET();
-	OLED_SDA_SET();
-}
-
 void setupPotentionmeter(void)
 {
 	GPIOA->MODER &= ~(GPIO_MODER_MODER5);
-	GPIOA->MODER |= (0b01 << GPIO_MODER_MODER5_Pos);
+	GPIOA->MODER |= (MY_GPIO_MODE_OUTPUT << GPIO_MODER_MODER5_Pos);
 	GPIOA->OTYPER &= (GPIO_OTYPER_OT5);
 	GPIOA->OSPEEDR &= (GPIO_OSPEEDR_OSPEED5);
 
 	GPIOA->MODER &= ~(GPIO_MODER_MODER4);
-	GPIOA->MODER |= (0b11 << GPIO_MODER_MODER4_Pos);
+	GPIOA->MODER |= (MY_GPIO_MODE_ANALOG << GPIO_MODER_MODER4_Pos);
 	ADC1->CR2 |= ADC_CR2_ADON;
 	ADC1->SMPR2 |= ADC_SMPR2_SMP4;
 	ADC1->SQR1 &= ~(ADC_SQR1_L);
@@ -119,7 +120,7 @@ void setupLightSensor(void)
 {
 	// Setup PA1 as analog input for light sensor (ADC1 channel 1)
 	GPIOA->MODER &= ~(GPIO_MODER_MODER1);
-	GPIOA->MODER |= (0b11 << GPIO_MODER_MODER1_Pos);
+	GPIOA->MODER |= (MY_GPIO_MODE_ANALOG << GPIO_MODER_MODER1_Pos);
 
 	// ADC configuration for light sensor
 	// Note: ADC1 is already enabled by setupPotentionmeter()

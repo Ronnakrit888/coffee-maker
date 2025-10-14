@@ -4,7 +4,6 @@
 #include "gpio_types.h"
 #include "exti_handlers.h"
 #include "setup.h"
-#include "temperature.h"
 #include "oled_driver.h"
 
 void selectButton(void)
@@ -72,7 +71,7 @@ int main(void)
 	selectButton();
 
 	// Delay to let UART stabilize
-	delay();
+	delay(1000);
 
 	// Read ambient light and recommend menu
 	recommendMenuByLight();
@@ -86,10 +85,8 @@ int main(void)
 		// Start ADC conversion for potentiometer reading
 		ADC1->CR2 |= ADC_CR2_SWSTART;
 
-		// Delay 2 seconds between conversions
-		for (volatile uint32_t iter = 0; iter < 3200000; iter++)
-			;
-
+		delay(2000);
+		
         // OLED countdown animation (commented out in original code)
         char count_str[2];
 		uint8_t max_number = 4;
@@ -117,7 +114,7 @@ int main(void)
 
             if (count > 0)
             {
-                delay(); // Delay for 1 second
+                delay(1000); // Delay for 1 second
             }
         }
     }
