@@ -4,6 +4,8 @@
 #include "gpio_types.h"
 #include "exti_handlers.h"
 #include "temperature.h"
+#include "led.h"
+#include "setup.h"
 
 const uint8_t seven_seg_patterns[10] = {
 	0x00, // 0: segments pattern (masked to 4 bits)
@@ -313,6 +315,10 @@ void display(uint8_t num)
 		{
 			sprintf(stringOut, "!!! SAFETY HALT !!! Temp too high for %s. Back to Menu\r\n", roast[state_selections[3]]);
 			vdg_UART_TxString(stringOut);
+			
+			for (uint8_t count = 5; count >= 0; count--) {
+				alert_LED();
+			}
 			current_state = 0;
 			counter = 0;
 			display(counter);

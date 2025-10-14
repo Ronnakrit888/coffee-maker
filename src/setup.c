@@ -5,6 +5,11 @@
 #include "setup.h"
 #include "oled_driver.h"
 
+void delay(void)
+{
+	for (uint32_t iter = 0; iter < 133333; iter++);
+}
+
 void setupFPU(void)
 {
 	SCB->CPACR |= (0b1111 << 20);

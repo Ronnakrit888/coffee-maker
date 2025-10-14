@@ -16,6 +16,26 @@ void GPIO_Button_Init(GPIO_TypeDef *GPIOx, uint8_t pin_number, MY_GPIO_Pull_Type
     GPIOx->PUPDR |= (pull_config << (pin_number * 2));
 }
 
+void toggle_LED1(void)
+{
+    GPIOB->ODR ^= GPIO_ODR_OD6;
+}
+
+void toggle_LED2(void)
+{
+    GPIOA->ODR ^= GPIO_ODR_OD7;
+}
+
+void toggle_LED3(void)
+{
+    GPIOA->ODR ^= GPIO_ODR_OD6;
+}
+
+void toggle_LED4(void)
+{
+    GPIOA->ODR ^= GPIO_ODR_OD5;
+}
+
 void onLED1(bool isOn)
 {
     if (isOn)

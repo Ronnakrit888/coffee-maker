@@ -7,12 +7,6 @@
 #include "temperature.h"
 #include "oled_driver.h"
 
-void delay(void)
-{
-	for (uint32_t iter = 0; iter < 133333; iter++)
-		;
-}
-
 void selectButton(void)
 {
 	/* Setup GPIO PA2, PA3*/
@@ -86,12 +80,13 @@ int main(void)
     {
 
         char count_str[2];
+		uint8_t max_number = 4;
 
-        for (int8_t count = 4; count >= 0; count--)
+        for (int8_t count = max_number; count >= 0; count--)
         {
             OLED_Fill(0);
-
-			uint8_t percentage = count * 25;
+			
+			uint8_t percentage = (max_number - count) * 25;
 
 			OLED_DrawProgressBar(0, 56, SSD1306_WIDTH, 8, percentage);
 
@@ -108,10 +103,10 @@ int main(void)
 
             OLED_UpdateScreen();
 
-            if (count > 0)
-            {
-                delay(); // Delay for 1 second
-            }
+            // if (count > 0)
+            // {
+            //     delay(); // Delay for 1 second
+            // }
         }
     }
 }

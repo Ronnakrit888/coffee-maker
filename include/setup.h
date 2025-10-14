@@ -5,6 +5,8 @@
 #include "stm32f4xx.h"
 #include "gpio_types.h"
 
+void delay(void);
+
 void setupFPU(void);
 
 void setupButton(void);

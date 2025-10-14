@@ -49,5 +49,9 @@ void onLED1(bool isOn);
 void onLED2(bool isOn);
 void onLED3(bool isOn);
 void onLED4(bool isOn);
+void toggle_LED1(void);
+void toggle_LED2(void);
+void toggle_LED3(void);
+void toggle_LED4(void);
 
 #endif
