@@ -315,8 +315,9 @@ void display(uint8_t num)
 		{
 			sprintf(stringOut, "!!! SAFETY HALT !!! Temp too high for %s. Back to Menu\r\n", roast[state_selections[3]]);
 			vdg_UART_TxString(stringOut);
-			
-			for (uint8_t count = 5; count >= 0; count--) {
+
+			for (uint8_t iter = 0; iter < 10; iter++)
+			{
 				alert_LED();
 			}
 			current_state = 0;

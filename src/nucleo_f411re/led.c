@@ -4,7 +4,8 @@
 
 void alert_LED(void)
 {
-    
-    GPIOB->ODR ^= GPIO_ODR_OD6;
-
+    toggle_LED1();
+    toggle_LED2();
+    toggle_LED3();
+    toggle_LED4();
 }

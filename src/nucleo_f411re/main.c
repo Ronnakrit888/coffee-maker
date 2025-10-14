@@ -86,7 +86,7 @@ int main(void)
         {
             OLED_Fill(0);
 			
-			uint8_t percentage = (max_number - count) * 25;
+			uint8_t percentage = (max_number - count) * (100 / 4);
 
 			OLED_DrawProgressBar(0, 56, SSD1306_WIDTH, 8, percentage);
 
@@ -103,10 +103,10 @@ int main(void)
 
             OLED_UpdateScreen();
 
-            // if (count > 0)
-            // {
-            //     delay(); // Delay for 1 second
-            // }
+            if (count > 0)
+            {
+                delay(); // Delay for 1 second
+            }
         }
     }
 }
