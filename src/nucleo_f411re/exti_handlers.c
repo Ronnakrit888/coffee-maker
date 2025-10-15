@@ -9,6 +9,8 @@
 #include "check.h"
 #include "state_globals.h"
 
+volatile uint8_t safety_halt_released = 0;
+
 // ADC interrupt handler - read potentiometer value
 void ADC_IRQHandler(void)
 {
@@ -21,7 +23,7 @@ void ADC_IRQHandler(void)
 		if (current_state == 3)
 		{
 			uint8_t tamping_level = getTampingLevel(adc_value);
-			const char* tamping_desc = getTampingDescription(tamping_level);
+			const char *tamping_desc = getTampingDescription(tamping_level);
 
 			sprintf(stringOut, "[Tamping] ADC: %d | Level: %s | Taste: %s\r\n",
 					adc_value, tamping_levels[tamping_level], tamping_desc);
@@ -80,44 +82,54 @@ void EXTI9_5_IRQHandler(void)
 	{
 		if ((GPIOB->IDR & GPIO_IDR_ID5) == 0)
 		{
-			// Special handling for tamping state (state 3)
-			if (current_state == 3)
-			{
-				// Use current ADC value to get tamping level
-				uint8_t tamping_level = getTampingLevel(adc_value);
-				state_selections[current_state] = tamping_level;
 
-				vdg_UART_TxString("\r\n========================================\r\n");
-				sprintf(stringOut, "CONFIRMED: %s - %s\r\n", tamping_levels[tamping_level], getTampingDescription(tamping_level));
-				vdg_UART_TxString(stringOut);
-				vdg_UART_TxString("========================================\r\n");
+			if (safety_halt_released == 0)
+			{
+				safety_halt_released = 1;
 			}
 			else
 			{
-				// Normal states use counter
-				state_selections[current_state] = counter;
-			}
 
-			if (current_state < 7)
-			{
-				current_state++;
-				// Show options for the new state (1-5 only, skip state 3 as it uses potentiometer)
-				if (current_state >= 0 && current_state <= 5 && current_state != 3)
+				// Special handling for tamping state (state 3)
+				if (current_state == 3)
 				{
-					showStateOptions(current_state);
-				}
-				else if (current_state == 3)
-				{
-					// For tamping state, show instructions
-					showStateOptions(current_state);
-				}
-			}
-			counter = 0;
+					// Use current ADC value to get tamping level
+					uint8_t tamping_level = getTampingLevel(adc_value);
+					state_selections[current_state] = tamping_level;
 
-			// Don't call display for state 3, it's handled by ADC interrupt
-			if (current_state != 3)
-			{
-				display(counter);
+					vdg_UART_TxString("\r\n========================================\r\n");
+					sprintf(stringOut, "CONFIRMED: %s - %s\r\n", tamping_levels[tamping_level], getTampingDescription(tamping_level));
+					vdg_UART_TxString(stringOut);
+					vdg_UART_TxString("========================================\r\n");
+				}
+
+				else
+				{
+					// Normal states use counter
+					state_selections[current_state] = counter;
+				}
+
+				if (current_state < 7)
+				{
+					current_state++;
+					// Show options for the new state (1-5 only, skip state 3 as it uses potentiometer)
+					if (current_state >= 0 && current_state <= 5 && current_state != 3)
+					{
+						showStateOptions(current_state);
+					}
+					else if (current_state == 3)
+					{
+						// For tamping state, show instructions
+						showStateOptions(current_state);
+					}
+				}
+				counter = 0;
+
+				// Don't call display for state 3, it's handled by ADC interrupt
+				if (current_state != 3)
+				{
+					display(counter);
+				}
 			}
 		}
 		EXTI->PR |= EXTI_PR_PR5;
@@ -131,25 +143,34 @@ void EXTI4_IRQHandler(void)
 		if ((GPIOB->IDR & GPIO_IDR_ID4) == 0)
 		{
 			state_selections[current_state] = counter;
-			if (current_state != 0)
+
+			// Set 0 when Alert High Temperature
+			if (safety_halt_released == 0)
 			{
-				// Show going back message
-				vdg_UART_TxString("\r\n========================================\r\n");
-				sprintf(stringOut, "Going back from [%s] to [%s]\r\n",
-						state_names[current_state], state_names[current_state - 1]);
-				vdg_UART_TxString(stringOut);
-				vdg_UART_TxString("========================================\r\n");
-
-				current_state--;
-				// Show options when going back (0-5)
-				if (current_state >= 0 && current_state <= 5)
-				{
-					showStateOptions(current_state);
-				}
+				safety_halt_released = 1;
 			}
+			else
+			{
+				if (current_state != 0)
+				{
+					// Show going back message
+					vdg_UART_TxString("\r\n========================================\r\n");
+					sprintf(stringOut, "Going back from [%s] to [%s]\r\n",
+							state_names[current_state], state_names[current_state - 1]);
+					vdg_UART_TxString(stringOut);
+					vdg_UART_TxString("========================================\r\n");
 
-			counter = state_selections[current_state];
-			display(counter);
+					current_state--;
+					// Show options when going back (0-5)
+					if (current_state >= 0 && current_state <= 5)
+					{
+						showStateOptions(current_state);
+					}
+				}
+
+				counter = state_selections[current_state];
+				display(counter);
+			}
 		}
 		EXTI->PR |= EXTI_PR_PR4;
 	}
@@ -165,7 +186,13 @@ void vdg_UART_TxString(char strOut[])
 	}
 }
 
-// Recommend menu based on ambient light
+void send_current_state_via_uart(void)
+{
+	sprintf(stringOut, "%d,%d,%d\n", (int)current_state, (int)counter, (int)safety_halt_released);
+
+	vdg_UART_TxString(stringOut);
+}
+
 void recommendMenuByLight(void)
 {
 	float light_lux = readLightIntensity();
@@ -361,7 +388,7 @@ void display(uint8_t num)
 		// Tamping state - read potentiometer and display real-time
 		uint16_t adc_value = readPotentiometer();
 		uint8_t tamping_level = getTampingLevel(adc_value);
-		const char* tamping_desc = getTampingDescription(tamping_level);
+		const char *tamping_desc = getTampingDescription(tamping_level);
 
 		sprintf(stringOut, "[Tamping] ADC: %d | Level: %s | Taste: %s\r\n",
 				adc_value, tamping_levels[tamping_level], tamping_desc);
@@ -376,15 +403,40 @@ void display(uint8_t num)
 		{
 			sprintf(stringOut, "!!! SAFETY HALT !!! Temp too high for %s. Back to Menu\r\n", roast[state_selections[4]]);
 			vdg_UART_TxString(stringOut);
+			vdg_UART_TxString("========================================\r\n");
+			vdg_UART_TxString("  PB5  - Confirm\r\n");
+			vdg_UART_TxString("  PB4  - Back\r\n");
+			vdg_UART_TxString("========================================\r\n\r\n");
 
-			current_state = 0;
-			counter = 0;
+			safety_halt_released = 0;
+
+			while (safety_halt_released == 0)
+			{
+				toggle_LED1();
+				toggle_LED2();
+				toggle_LED3();
+				toggle_LED4();
+				delay(1000);
+			}
+
+			onLED1(false);
+			onLED2(false);
+			onLED3(false);
+			onLED4(false);
+
+			current_state = 4;
+			counter = state_selections[current_state];
+			showStateOptions(current_state);
 			display(counter);
 			return;
 		}
 		else
 		{
 			// SAFE TO PROCEED: Display the current selection for State 5 (Strength/Quantity)
+			onLED1(false);
+			onLED2(false);
+			onLED3(false);
+			onLED4(false);
 			sprintf(stringOut, "[Strength/Quantity] Shots: %d\r\n",
 					(uint16_t)counter + 1);
 		}

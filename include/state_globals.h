@@ -5,13 +5,15 @@
 
 extern volatile uint8_t counter;
 extern volatile uint8_t current_state;
-extern char stringOut[100];
+extern char stringOut[];
 
 extern volatile uint8_t bean_weights[];
 extern volatile uint8_t current_temperature;
 extern volatile uint16_t adc_value;
 extern volatile uint8_t adc_ready;
 extern volatile uint8_t state_selections[];
+
+extern volatile uint8_t safety_halt_released;
 
 extern uint16_t water_level;
 extern uint16_t milk_level;

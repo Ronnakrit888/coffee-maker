@@ -35,7 +35,7 @@ const char *state_names[MAX_STATE_NAME] = {
 volatile uint8_t counter = 0;
 volatile uint8_t current_state = 0;
 
-char stringOut[100];
+char stringOut[128];
 
 volatile uint8_t bean_weights[MAX_BEAN_TYPES] = {5, 5, 5, 5, 5, 5};
 

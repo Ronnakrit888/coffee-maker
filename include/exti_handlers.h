@@ -19,4 +19,6 @@ void displayBeanWeights(void);
 uint16_t calculateCaffeine(uint8_t);
 void brewCoffee(void);
 
+void send_current_state_via_uart(void);
+
 #endif

@@ -38,48 +38,20 @@ void toggle_LED4(void)
 
 void onLED1(bool isOn)
 {
-    if (isOn)
-    {
-        GPIOB->ODR |= GPIO_ODR_OD6;
-    }
-    else
-    {
-        GPIOB->ODR &= ~GPIO_ODR_OD6;
-    }
+    isOn ? (GPIOB->ODR |= GPIO_ODR_OD6) : (GPIOB->ODR &= ~GPIO_ODR_OD6);
 }
 
 void onLED2(bool isOn)
 {
-    if (isOn)
-    {
-        GPIOA->ODR |= GPIO_ODR_OD7;
-    }
-    else
-    {
-        GPIOA->ODR &= ~GPIO_ODR_OD7;
-    }
+    isOn ? (GPIOA->ODR |= GPIO_ODR_OD7) : (GPIOA->ODR &= ~GPIO_ODR_OD7);
 }
 
 void onLED3(bool isOn)
 {
-    if (isOn)
-    {
-        GPIOA->ODR |= GPIO_ODR_OD6;
-    }
-    else
-    {
-        GPIOA->ODR &= ~GPIO_ODR_OD6;
-    }
+    isOn ? (GPIOA->ODR |= GPIO_ODR_OD6) : (GPIOA->ODR &= ~GPIO_ODR_OD6);
 }
 
 void onLED4(bool isOn)
 {
-    if (isOn)
-    {
-        GPIOA->ODR |= GPIO_ODR_OD5;
-    }
-    else
-    {
-        GPIOA->ODR &= ~GPIO_ODR_OD5;
-    }
+    isOn ? (GPIOA->ODR |= GPIO_ODR_OD5) : (GPIOA->ODR &= ~GPIO_ODR_OD5);
 }
