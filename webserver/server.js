@@ -136,25 +136,42 @@ function setupSerialPort() {
                     }
                 }
 
-                // 3. NEW: Parse Brewing Progress Data
+                // 3. UPDATED: Parse Brewing Progress Data (EXPECTS: step_id,step_percentage,global_percentage[,status])
                 else if (rawLine.includes(startProgressTag) && rawLine.includes(endProgressTag)) {
                     try {
                         const startIndex = rawLine.indexOf(startProgressTag) + startProgressTag.length;
                         const endIndex = rawLine.indexOf(endProgressTag);
                         dataString = rawLine.substring(startIndex, endIndex).trim();
                         
-                        const percentage = parseInt(dataString, 10);
+                        // Expected format: step_id, percentage, global_percentage [, FAIL]
+                        const parts = dataString.split(',');
                         
-                        if (!isNaN(percentage)) {
-                            const progressData = {
-                                percentage: percentage,
-                                timestamp: Math.floor(Date.now() / 1000)
-                            };
-                            console.log(`[PROGRESS] Data parsed and EMITTED:`, progressData);
-                            // Emit using a NEW event name
-                            io.emit('brewing_progress', progressData); 
+                        // Accept 3 or 4 parts
+                        if (parts.length >= 3 && parts.length <= 4) {
+                            const currentStepId = parts[0].trim();
+                            const percentage = parseInt(parts[1].trim(), 10);
+                            const globalPercentage = parseInt(parts[2].trim(), 10);
+                            
+                            // Check for optional 4th part 'FAIL'
+                            const isFailure = parts.length === 4 && parts[3].trim() === 'FAIL';
+
+                            if (isFailure || (!isNaN(percentage) && !isNaN(globalPercentage))) {
+                                const progressData = {
+                                    current_step_id: currentStepId,
+                                    // Send 0% on failure, otherwise use the reported percentage
+                                    percentage: isFailure ? 0 : percentage, 
+                                    global_percentage: globalPercentage,
+                                    // Set status based on failure flag or 100% completion
+                                    status: isFailure ? 'FAIL' : (percentage === 100 ? 'SUCCESS' : 'IN_PROGRESS'),
+                                    timestamp: Math.floor(Date.now() / 1000)
+                                };
+                                console.log(`[PROGRESS] Data parsed and EMITTED:`, progressData);
+                                io.emit('brewing_progress', progressData); 
+                            } else {
+                                console.warn(`[PROGRESS] Warning: Percentage values are invalid numbers and status is not FAIL. Raw: ${dataString}`);
+                            }
                         } else {
-                             console.warn(`[PROGRESS] Warning: Data string is not a valid percentage. Raw: ${dataString}`);
+                            console.warn(`[PROGRESS] Warning: Data string has invalid format (expected 3 or 4 parts). Raw: ${dataString}`);
                         }
 
                     } catch (e) {

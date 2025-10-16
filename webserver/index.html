@@ -141,7 +141,7 @@
         border-radius: 4px;
       }
 
-      /* --- MODAL STYLES (NEW) --- */
+      /* --- MODAL STYLES (UPDATED) --- */
       .modal {
         display: none; /* Hidden by default */
         position: fixed;
@@ -223,22 +223,37 @@
         margin-top: 15px;
         height: 20px; /* reserve space to prevent CLS */
       }
+
+      .progress-step-context { /* NEW STYLE */
+        font-size: 0.9em;
+        color: #7f8c8d;
+        margin-bottom: 10px;
+        font-style: italic;
+        height: 18px; /* Reserve space */
+      }
     </style>
   </head>
   <body>
-    <!-- BREWING PROGRESS MODAL (NEW) -->
+    <!-- BREWING PROGRESS MODAL (UPDATED) -->
     <div id="brewing-modal" class="modal">
       <div class="modal-content">
-        <div class="progress-title">
+        <div id="progress-modal-title" class="progress-title">
           ☕️
           <span>Brewing Coffee...</span>
+        </div>
+        <!-- NEW: Context for the current step -->
+        <div id="progress-step-context" class="progress-step-context">
+          Initializing...
         </div>
         <div class="progress-bar-container">
           <div id="progress-bar" class="progress-bar" style="width: 0%"></div>
         </div>
+        <!-- Note: This displays the main status text -->
         <div id="progress-text" class="progress-text">0% Complete</div>
         <p style="color: #7f8c8d; margin-top: 20px;">
-          Please wait while your perfect cup is being prepared.
+          <span id="progress-caption"
+            >Please wait while your perfect cup is being prepared.</span
+          >
         </p>
       </div>
     </div>
@@ -320,9 +335,9 @@
         "Coffee Beans Selection",
         "Tamping Level Selection",
         "Roast Level Selection",
-        "Safety Check (Roast Temp)", 
-        "Shot Quantity Selection", 
-        "Final Order Summary", 
+        "Safety Check (Roast Temp)",
+        "Shot Quantity Selection",
+        "Final Order Summary",
         "Brewing", // State 8
         "Complete / Return to Menu", // State 9 (Placeholder for system returning to 0)
       ];
@@ -364,11 +379,11 @@
           "9 Shots",
         ],
         // State 7: Final Order Summary
-        7: "Review Complete", 
-        
+        7: "Review Complete",
+
         // State 8: Brewing
         8: "Brewing in Progress...",
-        
+
         // State 9: Complete (Temporary state)
         9: "Process Complete",
       };
@@ -392,8 +407,13 @@
 
       // NEW Modal Elements
       const brewingModal = document.getElementById("brewing-modal");
+      const modalTitle = document.getElementById("progress-modal-title");
       const progressBar = document.getElementById("progress-bar");
       const progressText = document.getElementById("progress-text");
+      const progressCaption = document.getElementById("progress-caption");
+      const progressStepContext = document.getElementById(
+        "progress-step-context"
+      );
 
       let lastSummaryData = null; // Store the last summary data
 
@@ -414,62 +434,85 @@
       socket.on("stm32_update", (data) => {
         console.log("RECEIVED STATE UPDATE:", data);
         updateDisplay(data);
-        
+
         // 1. Modal Control
         if (data.current_state === 8) {
-            brewingModal.style.display = "block";
+          brewingModal.style.display = "block";
         } else if (data.current_state === 0) {
-             // Reset state and hide modal when returning to menu
-             brewingModal.style.display = "none";
-             progressBar.style.width = "0%";
-             progressBar.style.backgroundColor = "#3498db"; // Reset color
-             progressText.textContent = "0% Complete";
+          // Reset state and hide modal when returning to menu
+          brewingModal.style.display = "none";
+          // Reset modal appearance
+          progressBar.style.width = "0%";
+          progressBar.style.backgroundColor = "#3498db";
+          modalTitle.innerHTML = '☕️<span>Brewing Coffee...</span>';
+          progressText.textContent = "0% Complete";
+          progressCaption.textContent =
+            "Please wait while your perfect cup is being prepared.";
+          progressStepContext.textContent = "Initializing...";
         } else {
-            // Hide modal in all other non-brewing/non-reset states
-            brewingModal.style.display = "none";
+          // Hide modal in all other non-brewing/non-reset states
+          brewingModal.style.display = "none";
         }
       });
 
       socket.on("stm32_summary", (data) => {
         console.log("RECEIVED SUMMARY DATA:", data);
         lastSummaryData = data; // Store the summary
-        
+
         // Force current_state to 7 (Summary State index)
         updateDisplay({
-          current_state: 7, 
-          counter: 0, 
-          safety_halt_released: data.is_safety_idx, 
+          current_state: 7,
+          counter: 0,
+          safety_halt_released: data.is_safety_idx,
           timestamp: data.timestamp,
         });
       });
 
-      // NEW: Brewing progress handler
+      // UPDATED: Brewing progress handler to handle FAIL status
       socket.on("brewing_progress", (data) => {
         console.log("RECEIVED BREWING PROGRESS:", data);
-        const percentage = data.percentage;
-        
+
+        const status = data.status;
+        const globalPercentage = data.global_percentage;
+        // Replace underscores for better display
+        const stepId = data.current_step_id.replace(/_/g, " ");
+
         // Ensure modal is visible during progress updates
         brewingModal.style.display = "block";
-
-        progressBar.style.width = `${percentage}%`;
         
-        let message;
-        if (percentage < 10) {
-            message = "Grinding beans...";
-            progressBar.style.backgroundColor = "#e67e22"; // Orange for start
-        } else if (percentage > 0 && percentage < 100) {
-            message = `Brewing... (${percentage}%)`;
-            progressBar.style.backgroundColor = "#3498db"; // Blue for active
-        } else if (percentage === 100) {
-            message = "DONE! Enjoy your coffee! 😋";
-            progressBar.style.backgroundColor = "#2ecc71"; // Green for complete
+        // Always show the current step context
+        progressStepContext.textContent = `Step: ${stepId.toUpperCase()}`;
+
+
+        if (status === "FAIL") {
+          // --- FAILURE STATE ---
+          progressBar.style.width = `100%`; // Visually full bar to show the error point
+          progressBar.style.backgroundColor = "#e74c3c"; // Red for failure
+          modalTitle.innerHTML = '❌<span>Brewing Failed!</span>';
+          progressText.textContent = `ERROR: Failed during ${stepId.toUpperCase()} check.`;
+          progressCaption.textContent =
+            "See the STM32 UART Log below for the specific reason.";
+        } else if (status === "SUCCESS" && globalPercentage === 100) {
+          // --- FINAL SUCCESS STATE ---
+          progressBar.style.width = `100%`;
+          progressBar.style.backgroundColor = "#2ecc71"; // Green
+          modalTitle.innerHTML = '✅<span>Completed!</span>';
+          progressText.textContent = "DONE! Enjoy your perfect cup! 😋";
+          progressCaption.textContent =
+            "Returning to the main menu shortly.";
         } else {
-            message = `${percentage}% Complete`;
+          // --- IN_PROGRESS STATE ---
+          progressBar.style.width = `${globalPercentage}%`;
+          // Color coding: Orange for Pre-Checks (0-25%), Blue for Grinding/Brewing (25%-100%)
+          progressBar.style.backgroundColor =
+            globalPercentage <= 25 ? "#e67e22" : "#3498db";
+          modalTitle.innerHTML = '☕️<span>Brewing Coffee...</span>';
+          
+          progressText.textContent = `Global Progress: ${globalPercentage}%`;
+          progressCaption.textContent =
+            "Please wait while your perfect cup is being prepared.";
         }
-
-        progressText.textContent = message;
       });
-
 
       socket.on("log_message", (data) => {
         const msg = data.msg;
@@ -531,10 +574,10 @@
         availableChoicesDiv.innerHTML = ""; // Clear previous content
 
         // Check for State 7 (Summary State index) to trigger summary render
-        if (state === 7 && lastSummaryData) { 
+        if (state === 7 && lastSummaryData) {
           renderSummary(lastSummaryData);
           return;
-        } else if (state === 7) { 
+        } else if (state === 7) {
           availableChoicesDiv.innerHTML =
             '<p class="summary-title" style="color: #f39c12;">Awaiting Final Order Summary data...</p>';
           return;
