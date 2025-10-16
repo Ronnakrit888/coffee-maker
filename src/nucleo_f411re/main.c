@@ -68,7 +68,6 @@ int main(void)
 	setupLightSensor();
 	setupLED();
 	setupOLED();
-	setupFlameSensor();
 	selectButton();
 
 	// Delay to let UART stabilize
@@ -80,34 +79,4 @@ int main(void)
 	// Show welcome menu
 	showWelcomeMenu();
 	OLED_Init();
-
-	uint8_t blink_counter = 0;
-
-	onLED1(false);
-	onLED2(false);
-	onLED3(false);
-	onLED4(false);
-
-	while (1)
-	{
-		// Start ADC conversion for potentiometer reading
-		ADC1->CR2 |= ADC_CR2_SWSTART;
-
-		// Check flame sensor (PC5, Active Low)
-		if ((GPIOC->IDR & GPIO_IDR_ID5) == 0)
-		{
-			onLED3(false);
-			onLED1(true);
-
-			blink_counter++;
-		}
-		else
-		{
-			onLED1(false);
-			onLED3(true);
-			blink_counter = 0;
-		}
-
-		delay(200);  // Short delay for rapid blinking when fire detected
-	}
 }
