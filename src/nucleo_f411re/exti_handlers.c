@@ -459,11 +459,7 @@ void display(uint8_t num)
 	case 5:
 		if (checkRoastTemperatureSafety() == 1 && safety_halt_released == 0)
 		{
-			toggle_LED1();
-			toggle_LED2();
-			toggle_LED3();
-			toggle_LED4();
-
+	
 			sprintf(stringOut, "!!! SAFETY HALT !!! Temp too high for %s. Acknowledge to proceed.\r\n", roast[state_selections[4]]);
 			vdg_UART_TxString(stringOut);
 			vdg_UART_TxString("========================================\r\n");
