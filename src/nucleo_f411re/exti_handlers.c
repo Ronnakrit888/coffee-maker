@@ -28,6 +28,7 @@ static void handle_confirm(void)
 		counter = 0;
 		showStateOptions(current_state);
 		display(counter);
+		send_current_state_via_uart();
 		return;
 	}
 
@@ -60,6 +61,7 @@ static void handle_confirm(void)
 		// Temperature is unsafe - trigger safety halt
 		safety_halt_released = 0;
 		display(counter);  // This will show the safety halt message
+		send_current_state_via_uart();
 		return;
 	}
 
@@ -71,6 +73,7 @@ static void handle_confirm(void)
 	if (current_state != 3)
 	{
 		display(counter);
+		send_current_state_via_uart();
 	}
 }
 
@@ -94,6 +97,7 @@ static void handle_back(void)
 			counter = state_selections[current_state];
 			showStateOptions(current_state);
 			display(counter);
+			send_current_state_via_uart();
 			return;
 		}
 	}
@@ -119,6 +123,7 @@ static void handle_back(void)
 	// Restore selection for the new state
 	counter = state_selections[current_state];
 	display(counter);
+	send_current_state_via_uart();
 }
 
 // ADC interrupt handler - read potentiometer value
@@ -157,6 +162,7 @@ void EXTI15_10_IRQHandler(void)
 				counter = 0;
 			}
 			display(counter);
+			send_current_state_via_uart();
 		}
 
 		EXTI->PR |= EXTI_PR_PR10;
@@ -181,6 +187,7 @@ void EXTI3_IRQHandler(void)
 				counter--;
 			}
 			display(counter);
+			send_current_state_via_uart();
 		}
 		EXTI->PR |= EXTI_PR_PR3;
 	}
