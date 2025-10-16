@@ -430,6 +430,11 @@ void showStateOptions(uint8_t state)
 		last_tamping_display_time = 0;
 		last_tamping_level = 0xFF;
 
+		// Configure ADC to use Channel 4 (Potentiometer on PA4)
+		ADC1->SQR3 &= ~(ADC_SQR3_SQ1);           // Clear channel selection
+		ADC1->SQR3 |= (4 << ADC_SQR3_SQ1_Pos);   // Set to Channel 4
+		ADC1->SMPR2 |= ADC_SMPR2_SMP4;           // Set sampling time for channel 4
+
 		// Start continuous ADC conversion for potentiometer
 		ADC1->CR2 |= ADC_CR2_CONT;
 		ADC1->CR2 |= ADC_CR2_SWSTART;
