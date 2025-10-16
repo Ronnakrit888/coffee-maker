@@ -25,8 +25,8 @@ static void handle_confirm(void)
 		onLED4(false);
 
 		counter = 0;
-		display(counter);
 		showStateOptions(current_state);
+		display(counter);
 		return;
 	}
 
@@ -52,6 +52,15 @@ static void handle_confirm(void)
 	}
 
 	counter = 0;
+
+	// Check for safety halt BEFORE showing options
+	if (current_state == 5 && checkRoastTemperatureSafety() == 1)
+	{
+		// Temperature is unsafe - trigger safety halt
+		safety_halt_released = 0;
+		display(counter);  // This will show the safety halt message
+		return;
+	}
 
 	if (current_state <= 5)
 	{
@@ -425,13 +434,12 @@ void display(uint8_t num)
 				roast[counter]);
 		break;
 	case 5:
-		if (checkRoastTemperatureSafety() == 1)
+		if (checkRoastTemperatureSafety() == 1 && safety_halt_released == 0)
 		{
 			toggle_LED1();
             toggle_LED2();
             toggle_LED3();
             toggle_LED4();
-            safety_halt_released = 0;
 
             sprintf(stringOut, "!!! SAFETY HALT !!! Temp too high for %s. Acknowledge to proceed.\r\n", roast[state_selections[4]]);
             vdg_UART_TxString(stringOut);
