@@ -8,6 +8,7 @@
 #include "setup.h"
 #include "check.h"
 #include "state_globals.h"
+#include "oled_driver.h"
 
 volatile uint8_t safety_halt_released = 0;
 
@@ -428,18 +429,18 @@ void display(uint8_t num)
 		if (checkRoastTemperatureSafety() == 1)
 		{
 			toggle_LED1();
-            toggle_LED2();
-            toggle_LED3();
-            toggle_LED4();
-            safety_halt_released = 0;
+			toggle_LED2();
+			toggle_LED3();
+			toggle_LED4();
+			safety_halt_released = 0;
 
-            sprintf(stringOut, "!!! SAFETY HALT !!! Temp too high for %s. Acknowledge to proceed.\r\n", roast[state_selections[4]]);
-            vdg_UART_TxString(stringOut);
-            vdg_UART_TxString("========================================\r\n");
-            vdg_UART_TxString("  PB5  - Confirm/Proceed\r\n");
-            vdg_UART_TxString("  PB4  - Back to Roast\r\n");
-            vdg_UART_TxString("========================================\r\n\r\n");
-            return;
+			sprintf(stringOut, "!!! SAFETY HALT !!! Temp too high for %s. Acknowledge to proceed.\r\n", roast[state_selections[4]]);
+			vdg_UART_TxString(stringOut);
+			vdg_UART_TxString("========================================\r\n");
+			vdg_UART_TxString("  PB5  - Confirm/Proceed\r\n");
+			vdg_UART_TxString("  PB4  - Back to Roast\r\n");
+			vdg_UART_TxString("========================================\r\n\r\n");
+			return;
 		}
 		else
 		{
@@ -663,7 +664,34 @@ void brewCoffee(void)
 	delay(5000);
 
 	vdg_UART_TxString(">> Brewing coffee...\r\n");
-	delay(10000);
+	char count_str[2];
+	uint8_t max_number = 10;
+
+	for (int8_t count = max_number; count >= 0; count--)
+	{
+		OLED_Fill(0);
+
+		uint8_t percentage = (max_number - count) * (100 / max_number);
+
+		OLED_DrawProgressBar(0, 56, SSD1306_WIDTH, 8, percentage);
+
+		snprintf(count_str, sizeof(count_str), "%d", count);
+
+		// Calculate X position to approximately center a single 8x8 digit.
+		// SSD1306_WIDTH is 128. FONT_WIDTH is 8.
+		// Center X = (128 / 2) - (8 / 2) = 64 - 4 = 60
+		uint8_t centered_x = 60;
+
+		// Line 2: The actual countdown number (Starts at y=16, which is page-aligned)
+		OLED_DrawString(centered_x, 24, count_str, 1);
+
+		OLED_UpdateScreen();
+
+		if (count > 0)
+		{
+			delay(1000); // Delay for 1 second
+		}
+	}
 
 	vdg_UART_TxString(">> Coffee brewing complete!\r\n\r\n");
 
