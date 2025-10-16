@@ -69,6 +69,7 @@ int main(void)
 	setupTemperature();
 	setupPotentionmeter();
 	setupLightSensor();
+	setupTrackingSensor();
 	setupLED();
 	setupOLED();
 	selectButton();
