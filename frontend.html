@@ -1,0 +1,163 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>STM32 WebSocket Data Viewer</title>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/socket.io/4.1.2/socket.io.js"></script>
+    <style>
+        body { font-family: sans-serif; margin: 20px; background-color: #f4f4f9; }
+        .container { max-width: 800px; margin: 0 auto; background-color: #fff; padding: 20px; border-radius: 8px; box-shadow: 0 4px 8px rgba(0,0,0,0.1); }
+        h1 { color: #333; border-bottom: 2px solid #eee; padding-bottom: 10px; }
+        .data-item { margin-bottom: 10px; padding: 10px; background-color: #e9ecef; border-radius: 4px; }
+        .data-item strong { display: inline-block; width: 220px; color: #007bff; }
+        .data-value { font-weight: bold; color: #333; }
+        #connection-status { font-weight: bold; }
+        #connection-status.connected { color: green; }
+        #connection-status.disconnected { color: red; }
+        #log-console { height: 150px; overflow-y: scroll; border: 1px solid #ccc; padding: 10px; background-color: #333; color: #0f0; font-family: monospace; }
+    </style>
+</head>
+<body>
+
+    <div class="container">
+        <h1>STM32 Real-Time Data (WebSocket)</h1>
+        <p>Status: <span id="connection-status" class="disconnected">Connecting...</span></p>
+        
+        <h2>Current System Status</h2>
+        <div id="mapped-data-display">
+            <div class="data-item"><strong>Current State Name:</strong> <span id="state-name" class="data-value">Awaiting data...</span></div>
+            <div class="data-item"><strong>Current Selection:</strong> <span id="selection-name" class="data-value">Awaiting data...</span></div>
+        </div>
+        
+        <h2>Raw Data (IDs)</h2>
+        <div id="data-display">
+            <div class="data-item"><strong>Current State (ID):</strong> <span id="raw-state-id" class="data-value">Awaiting data...</span></div>
+            <div class="data-item"><strong>Counter Value (ID):</strong> <span id="raw-counter-id" class="data-value">Awaiting data...</span></div>
+            <div class="data-item"><strong>Safety Halt Released:</strong> <span id="safety-halt" class="data-value">Awaiting data...</span></div>
+        </div>
+        
+        <div class="data-item"><strong>Last Update Received:</strong> <span id="last-updated">N/A</span></div>
+        
+        <h2>STM32 UART Log</h2>
+        <div id="log-console"></div>
+    </div>
+
+    <script>
+        // Connect to the Socket.IO server running on localhost:5000
+        const socket = io('http://127.0.0.1:5000'); 
+
+        // --- MAPPING ARRAYS (Copied from your C code) ---
+        const STATE_NAMES = [
+            "Menu Selection", "Temperature Selection", "Coffee Beans Selection", 
+            "Tamping Level Selection", "Roast Level Selection", "Shot Quantity Selection", 
+            "Final Order Summary", "Brewing"
+        ];
+        
+        const SELECTION_MAPS = {
+            // State 0: Menu Selection (uses counter)
+            0: ["Espresso", "Americano", "Cappuccino", "Latte", "Mocha", 
+                "Macchiato", "Flat White", "Affogato", "Ristretto", "Lungo"],
+            // State 1: Temperature Selection (uses counter)
+            1: ["Hot", "Cold", "Blended"],
+            // State 2: Coffee Beans Selection (uses counter)
+            2: ["Arabica", "Robusta", "Liberica", "Excelsa", "Geisha", "Bourbon"],
+            // State 3: Tamping Level Selection (uses counter)
+            3: ["Very Light", "Light", "Medium", "Strong", "Very Strong"],
+            // State 4: Roast Level Selection (uses counter)
+            4: ["Light Roast", "Medium Roast", "Medium Dark Roast", "Dark Roast"],
+            // State 5: Shot Quantity Selection (counter is 0-indexed, so add 1 for display)
+            5: (counter) => `${counter + 1} Shot(s)`, 
+            // State 6: Final Order Summary (counter is ignored/0)
+            6: "Review Complete", 
+            // State 7: Brewing (counter is ignored/0)
+            7: "Brewing in Progress..."
+        };
+
+        // --- DOM Elements ---
+        const lastUpdatedSpan = document.getElementById('last-updated');
+        const statusSpan = document.getElementById('connection-status');
+        const logConsole = document.getElementById('log-console');
+        
+        const stateNameSpan = document.getElementById('state-name');
+        const selectionNameSpan = document.getElementById('selection-name');
+        const rawStateIdSpan = document.getElementById('raw-state-id');
+        const rawCounterIdSpan = document.getElementById('raw-counter-id');
+        const safetyHaltSpan = document.getElementById('safety-halt');
+
+
+        // --- Socket.IO Event Handlers (Same as before) ---
+        socket.on('connect', () => {
+            statusSpan.textContent = 'Connected';
+            statusSpan.className = 'connected';
+            console.log('WebSocket Connected!');
+        });
+
+        socket.on('disconnect', () => {
+            statusSpan.textContent = 'Disconnected';
+            statusSpan.className = 'disconnected';
+            // Clear or reset displays on disconnect
+            stateNameSpan.textContent = selectionNameSpan.textContent = 'Connection Lost';
+        });
+
+        socket.on('stm32_update', (data) => {
+            updateDisplay(data);
+        });
+        
+        socket.on('log_message', (data) => {
+            const msg = data.msg;
+            const logEntry = document.createElement('div');
+            logEntry.textContent = msg;
+            logConsole.appendChild(logEntry);
+            logConsole.scrollTop = logConsole.scrollHeight;
+        });
+
+
+        // --- UI Update Function (Modified) ---
+        function updateDisplay(data) {
+            
+            const currentState = data.current_state;
+            const counter = data.counter;
+            
+            // 1. RAW Data Update
+            const lastUpdatedTime = new Date(data.timestamp * 1000).toLocaleTimeString('en-US', {hour12: false});
+            lastUpdatedSpan.textContent = lastUpdatedTime;
+            rawStateIdSpan.textContent = currentState;
+            rawCounterIdSpan.textContent = counter;
+
+            // Safety Halt status update
+            safetyHaltSpan.textContent = data.safety_halt_released === 1 ? 'YES (1) - HALTED' : 'NO (0) - SAFE';
+            safetyHaltSpan.style.color = data.safety_halt_released === 1 ? 'red' : 'green';
+
+
+            // 2. MAPPED/DESCRIPTIVE Data Update
+            
+            // A. Current State Name
+            stateNameSpan.textContent = STATE_NAMES[currentState] || `Unknown State (${currentState})`;
+            
+            // B. Current Selection Name (Mapping based on the current state)
+            let selectionName = 'N/A';
+            const map = SELECTION_MAPS[currentState];
+
+            if (map) {
+                if (typeof map === 'function') {
+                    // Custom function for states like Shot Quantity
+                    selectionName = map(counter);
+                } else if (Array.isArray(map)) {
+                    // Array mapping for menu, temp, bean, roast, tamping
+                    selectionName = map[counter] || `Unknown Index (${counter})`;
+                } else {
+                    // Static text for states like Final Order Summary, Brewing
+                    selectionName = map; 
+                }
+            } else {
+                selectionName = `No Selection Map for State ${currentState}`;
+            }
+
+            selectionNameSpan.textContent = selectionName;
+        }
+
+    </script>
+
+</body>
+</html>
