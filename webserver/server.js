@@ -3,12 +3,12 @@ const http = require('http');
 const { Server } = require("socket.io");
 const { SerialPort } = require('serialport');
 const { ReadlineParser } = require('@serialport/parser-readline');
+require('dotenv').config();
 
 // --- Configuration ---
-// !!! IMPORTANT: Replace this with your actual COM port
-const SERIAL_PORT = '/dev/tty.usbmodem1403';
-const BAUD_RATE = 115200;
-const SERVER_PORT = 5000;
+const SERIAL_PORT = process.env.SERIAL_PORT || '/dev/tty.usbmodem1403';
+const BAUD_RATE = parseInt(process.env.BAUD_RATE) || 115200;
+const SERVER_PORT = parseInt(process.env.SERVER_PORT) || 5000;
 // ---------------------
 
 const app = express();
@@ -28,6 +28,7 @@ let parser = null;
 // Function to initialize serial connection
 function setupSerialPort() {
     console.log(`Attempting to connect to serial port: ${SERIAL_PORT}`);
+    console.log(`Baud Rate: ${BAUD_RATE}`);
     
     // Check if the port is already open
     if (serialPort && serialPort.isOpen) {
@@ -67,14 +68,18 @@ function setupSerialPort() {
                 const startTag = "[DATASTART]";
                 const endTag = "[DATAEND]";
 
+                const startSummaryTag = "[SUMMARYSTART]";
+                const endSummaryTag = "[SUMMARYEND]";
+                
+                let dataString = '';
+
+                // 1. Parse Primary State Data
                 if (rawLine.includes(startTag) && rawLine.includes(endTag)) {
                     try {
-                        // Extract the data string between the tags
                         const startIndex = rawLine.indexOf(startTag) + startTag.length;
                         const endIndex = rawLine.indexOf(endTag);
-                        const dataString = rawLine.substring(startIndex, endIndex).trim();
+                        dataString = rawLine.substring(startIndex, endIndex).trim();
                         
-                        // Parse integer values
                         const values = dataString.split(',').map(v => parseInt(v.trim(), 10));
                         
                         if (values.length === 3 && !values.some(isNaN)) {
@@ -84,19 +89,50 @@ function setupSerialPort() {
                                 "safety_halt_released": values[2],
                                 "timestamp": Math.floor(Date.now() / 1000)
                             };
-                            console.log(`Data parsed and EMITTED:`, data);
-                            
-                            // Emit the structured data via WebSocket
+                            console.log(`[STATE] Data parsed and EMITTED:`, data);
                             io.emit('stm32_update', data); 
                         } else {
-                            console.warn(`Warning: Data string has invalid format or length (${values.length} values, expected 3). Raw: ${dataString}`);
+                            console.warn(`[STATE] Warning: Data string has invalid format or length. Raw: ${dataString}`);
                         }
 
                     } catch (e) {
-                        console.error(`Error parsing data line: ${e}. Raw data: ${rawLine}`);
+                        console.error(`[STATE] Error parsing data line: ${e}. Raw data: ${rawLine}`);
                     }
-                } else {
-                    // Emit raw log messages for the console
+                }
+                
+                // 2. Parse Summary Data
+                else if (rawLine.includes(startSummaryTag) && rawLine.includes(endSummaryTag)) {
+                    try {
+                        const startIndex = rawLine.indexOf(startSummaryTag) + startSummaryTag.length;
+                        const endIndex = rawLine.indexOf(endSummaryTag);
+                        dataString = rawLine.substring(startIndex, endIndex).trim();
+
+                        // The summary has 6 indices: Menu, Temp, Bean, Tamping, Roast, Shots (pre-incremented)
+                        const values = dataString.split(',').map(v => parseInt(v.trim(), 10));
+                        
+                        if (values.length === 6 && !values.some(isNaN)) {
+                            const summaryData = {
+                                "menu_idx": values[0],
+                                "temp_idx": values[1],
+                                "bean_idx": values[2],
+                                "tamping_idx": values[3],
+                                "roast_idx": values[4],
+                                "shots": values[5], // This is the final shot count (1-indexed)
+                                "timestamp": Math.floor(Date.now() / 1000)
+                            };
+                            console.log(`[SUMMARY] Data parsed and EMITTED:`, summaryData);
+                            // Emit using a NEW event name
+                            io.emit('stm32_summary', summaryData); 
+                        } else {
+                             console.warn(`[SUMMARY] Warning: Data string has invalid format or length. Raw: ${dataString}`);
+                        }
+
+                    } catch (e) {
+                        console.error(`[SUMMARY] Error parsing data line: ${e}. Raw data: ${rawLine}`);
+                    }
+                }
+                // 3. Emit raw log messages
+                else {
                     io.emit('log_message', { msg: rawLine });
                 }
             }

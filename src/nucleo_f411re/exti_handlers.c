@@ -60,7 +60,7 @@ static void handle_confirm(void)
 	{
 		// Temperature is unsafe - trigger safety halt
 		safety_halt_released = 0;
-		display(counter);  // This will show the safety halt message
+		display(counter); // This will show the safety halt message
 		send_current_state_via_uart();
 		return;
 	}
@@ -234,6 +234,21 @@ void send_current_state_via_uart(void)
 	sprintf(stringOut, "%d,%d,%d", (int)current_state, (int)counter, (int)safety_halt_released);
 	vdg_UART_TxString(stringOut);
 	vdg_UART_TxString("[DATAEND]\n");
+}
+
+void send_summary_state(void)
+{
+
+	uint8_t menu_idx = state_selections[0];
+	uint8_t temp_idx = state_selections[1];
+	uint8_t bean_idx = state_selections[2];
+	uint8_t tamping_idx = state_selections[3];
+	uint8_t roast_idx = state_selections[4];
+	uint8_t shots = state_selections[5] + 1;
+	vdg_UART_TxString("[SUMMARYSTART]");
+	sprintf(stringOut, "%d, %d, %d, %d, %d, %d", (int)menu_idx, (int)temp_idx, (int)bean_idx, (int)tamping_idx, (int)roast_idx, (int)shots);
+	vdg_UART_TxString(stringOut);
+	vdg_UART_TxString("[SUMMARYEND]");
 }
 
 void recommendMenuByLight(void)
@@ -445,9 +460,9 @@ void display(uint8_t num)
 		if (checkRoastTemperatureSafety() == 1 && safety_halt_released == 0)
 		{
 			toggle_LED1();
-            toggle_LED2();
-            toggle_LED3();
-            toggle_LED4();
+			toggle_LED2();
+			toggle_LED3();
+			toggle_LED4();
 
 			sprintf(stringOut, "!!! SAFETY HALT !!! Temp too high for %s. Acknowledge to proceed.\r\n", roast[state_selections[4]]);
 			vdg_UART_TxString(stringOut);
@@ -679,7 +694,7 @@ void brewCoffee(void)
 	delay(5000);
 
 	vdg_UART_TxString(">> Brewing coffee...\r\n");
-	char count_str[2];
+	char count_str[3];
 	uint8_t max_number = 10;
 
 	for (int8_t count = max_number; count >= 0; count--)
