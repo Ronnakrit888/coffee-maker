@@ -644,6 +644,48 @@ uint16_t calculateCaffeine(uint8_t shots)
 }
 
 // Main brewing process
+// Wait for cup placement using tracking sensor
+void waitForCupPlacement(void)
+{
+	vdg_UART_TxString("\r\n========================================\r\n");
+	vdg_UART_TxString("      CUP PLACEMENT CHECK\r\n");
+	vdg_UART_TxString("========================================\r\n");
+	vdg_UART_TxString("Please place your cup...\r\n");
+
+	// Check tracking sensor (PC9)
+	// HIGH (1) = WHITE surface (no cup), LOW (0) = BLACK/DARK (cup placed)
+	if ((GPIOC->IDR & GPIO_IDR_ID9) != 0)
+	{
+		// WHITE DETECTED - No cup, turn on GREEN LED (PB6) and wait
+		vdg_UART_TxString("⚠️  NO CUP DETECTED - Green LED ON\r\n");
+		vdg_UART_TxString("Waiting for cup placement...\r\n\r\n");
+
+		GPIOB->ODR &= ~GPIO_ODR_OD6;  // Green LED ON (set LOW)
+		GPIOA->ODR |= GPIO_ODR_OD7;   // Red LED OFF (set HIGH)
+
+		// Wait until BLACK is detected (cup placed)
+		while ((GPIOC->IDR & GPIO_IDR_ID9) != 0)
+		{
+			delay(100);
+		}
+
+		// Cup detected - turn on RED LED (PA7)
+		vdg_UART_TxString("✅ CUP DETECTED - Red LED ON\r\n");
+		GPIOB->ODR |= GPIO_ODR_OD6;   // Green LED OFF (set HIGH)
+		GPIOA->ODR &= ~GPIO_ODR_OD7;  // Red LED ON (set LOW)
+	}
+	else
+	{
+		// BLACK DETECTED - Cup already in place
+		vdg_UART_TxString("✅ CUP ALREADY IN PLACE - Red LED ON\r\n");
+		GPIOB->ODR |= GPIO_ODR_OD6;   // Green LED OFF (set HIGH)
+		GPIOA->ODR &= ~GPIO_ODR_OD7;  // Red LED ON (set LOW)
+	}
+
+	vdg_UART_TxString("========================================\r\n\r\n");
+	delay(1000);
+}
+
 void brewCoffee(void)
 {
     uint8_t bean_idx = state_selections[STATE_SELECT_BEAN];
@@ -758,6 +800,12 @@ void brewCoffee(void)
     }
     vdg_UART_TxString("Milk pass\r\n");
     vdg_UART_TxString("[CHECKMILKSTART_STATUS]PASS[CHECKMILKEND_STATUS]");
+	// Check for cup placement before brewing
+	waitForCupPlacement();
+
+	// Brewing process
+	vdg_UART_TxString(">> Grinding coffee beans...\r\n");
+	delay(5000);
 
     // Update progress: Milk Check complete (15% global)
     global_progress = 15;

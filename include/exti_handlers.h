@@ -18,6 +18,7 @@ void showStateOptions(uint8_t state);
 void displayBeanWeights(void);
 uint16_t calculateCaffeine(uint8_t);
 void brewCoffee(void);
+void waitForCupPlacement(void);
 
 void send_current_state_via_uart(void);
 

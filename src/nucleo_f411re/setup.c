@@ -156,3 +156,13 @@ void setupLightSensor(void)
 	// Note: ADC1 is already enabled by setupPotentionmeter()
 	// We just need to configure the channel when reading
 }
+
+void setupTrackingSensor(void)
+{
+	// Setup PC9 as digital input with pull-up for tracking sensor
+	GPIOC->MODER &= ~(GPIO_MODER_MODER9);
+	GPIOC->PUPDR &= ~(GPIO_PUPDR_PUPD9);
+	GPIOC->PUPDR |= (0b01 << GPIO_PUPDR_PUPD9_Pos);  // Pull-up
+
+	// Note: PA7 (Red LED) and PB6 (Green LED) are already configured by setupLED()
+}

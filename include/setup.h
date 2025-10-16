@@ -53,5 +53,6 @@ void setupOLED(void);
 void setupPotentionmeter(void);
 void setupLightSensor(void);
 void setupFlameSensor(void);
+void setupTrackingSensor(void);
 
 #endif
