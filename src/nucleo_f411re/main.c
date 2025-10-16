@@ -79,11 +79,4 @@ int main(void)
 	// Show welcome menu
 	showWelcomeMenu();
 	OLED_Init();
-
-	while (1)
-	{
-		// Start ADC conversion for potentiometer reading
-		ADC1->CR2 |= ADC_CR2_SWSTART;
-		delay(2000);
-	}
 }
