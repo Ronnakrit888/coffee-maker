@@ -70,6 +70,10 @@ function setupSerialPort() {
 
                 const startSummaryTag = "[SUMMARYSTART]";
                 const endSummaryTag = "[SUMMARYEND]";
+
+                // NEW: Brewing Progress Tags
+                const startProgressTag = "[BREWINGPROGRESSSTART]";
+                const endProgressTag = "[BREWINGPROGRESSEND]";
                 
                 let dataString = '';
 
@@ -107,7 +111,7 @@ function setupSerialPort() {
                         const endIndex = rawLine.indexOf(endSummaryTag);
                         dataString = rawLine.substring(startIndex, endIndex).trim();
 
-                        // The summary has 6 indices: Menu, Temp, Bean, Tamping, Roast, Shots (pre-incremented)
+                        // The summary has 7 indices: Menu, Temp, Bean, Tamping, Roast, Safety_Halt, Shots
                         const values = dataString.split(',').map(v => parseInt(v.trim(), 10));
                         
                         if (values.length === 7 && !values.some(isNaN)) {
@@ -122,7 +126,6 @@ function setupSerialPort() {
                                 "timestamp": Math.floor(Date.now() / 1000)
                             };
                             console.log(`[SUMMARY] Data parsed and EMITTED:`, summaryData);
-                            // Emit using a NEW event name
                             io.emit('stm32_summary', summaryData); 
                         } else {
                              console.warn(`[SUMMARY] Warning: Data string has invalid format or length. Raw: ${dataString}`);
@@ -132,7 +135,34 @@ function setupSerialPort() {
                         console.error(`[SUMMARY] Error parsing data line: ${e}. Raw data: ${rawLine}`);
                     }
                 }
-                // 3. Emit raw log messages
+
+                // 3. NEW: Parse Brewing Progress Data
+                else if (rawLine.includes(startProgressTag) && rawLine.includes(endProgressTag)) {
+                    try {
+                        const startIndex = rawLine.indexOf(startProgressTag) + startProgressTag.length;
+                        const endIndex = rawLine.indexOf(endProgressTag);
+                        dataString = rawLine.substring(startIndex, endIndex).trim();
+                        
+                        const percentage = parseInt(dataString, 10);
+                        
+                        if (!isNaN(percentage)) {
+                            const progressData = {
+                                percentage: percentage,
+                                timestamp: Math.floor(Date.now() / 1000)
+                            };
+                            console.log(`[PROGRESS] Data parsed and EMITTED:`, progressData);
+                            // Emit using a NEW event name
+                            io.emit('brewing_progress', progressData); 
+                        } else {
+                             console.warn(`[PROGRESS] Warning: Data string is not a valid percentage. Raw: ${dataString}`);
+                        }
+
+                    } catch (e) {
+                        console.error(`[PROGRESS] Error parsing data line: ${e}. Raw data: ${rawLine}`);
+                    }
+                }
+                
+                // 4. Emit raw log messages
                 else {
                     io.emit('log_message', { msg: rawLine });
                 }
@@ -156,5 +186,4 @@ app.get('/', (req, res) => {
 
 // Start the HTTP server
 server.listen(SERVER_PORT, '0.0.0.0', () => {
-    console.log(`Starting Node.js WebSocket server on http://127.0.0.1:${SERVER_PORT}`);
-});
+    console.log(`Starting Node.js WebSocket server on http://127.0.0.1:${SERVER_PORT}`);});

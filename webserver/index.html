@@ -7,11 +7,15 @@
     <!-- Use a specific, stable version -->
     <script src="https://cdnjs.cloudflare.com/ajax/libs/socket.io/4.1.2/socket.io.js"></script>
     <style>
+      /* Font import for Inter */
+      @import url("https://fonts.googleapis.com/css2?family=Inter:wght@100..900&display=swap");
+
       body {
         font-family: "Inter", sans-serif;
         margin: 0;
         padding: 20px;
         background-color: #f4f4f9;
+        color: #333;
       }
       .container {
         max-width: 1200px;
@@ -136,9 +140,110 @@
         padding: 4px 8px;
         border-radius: 4px;
       }
+
+      /* --- MODAL STYLES (NEW) --- */
+      .modal {
+        display: none; /* Hidden by default */
+        position: fixed;
+        z-index: 1000;
+        left: 0;
+        top: 0;
+        width: 100%;
+        height: 100%;
+        overflow: auto;
+        background-color: rgba(0, 0, 0, 0.6); /* Black w/ opacity */
+        backdrop-filter: blur(5px);
+        -webkit-backdrop-filter: blur(5px);
+        padding-top: 50px;
+      }
+
+      .modal-content {
+        background-color: #fff;
+        margin: 5% auto; /* 15% from the top and centered */
+        padding: 30px;
+        border: 1px solid #888;
+        width: 90%;
+        max-width: 500px;
+        border-radius: 12px;
+        box-shadow: 0 10px 30px rgba(0, 0, 0, 0.3);
+        text-align: center;
+        position: relative;
+      }
+
+      .progress-title {
+        color: #e67e22; /* Coffee color */
+        font-size: 1.8em;
+        margin-bottom: 20px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-weight: 700;
+      }
+      .progress-title span {
+        margin-left: 10px;
+      }
+
+      /* Progress Bar Styling */
+      .progress-bar-container {
+        width: 100%;
+        background-color: #ecf0f1;
+        border-radius: 50px;
+        margin: 20px 0;
+        height: 30px;
+        overflow: hidden;
+        box-shadow: inset 0 1px 3px rgba(0, 0, 0, 0.2);
+      }
+
+      .progress-bar {
+        height: 100%;
+        width: 0;
+        background-color: #3498db; /* Default Blue for progress */
+        background-image: linear-gradient(
+          45deg,
+          rgba(255, 255, 255, 0.15) 25%,
+          transparent 25%,
+          transparent 50%,
+          rgba(255, 255, 255, 0.15) 50%,
+          rgba(255, 255, 255, 0.15) 75%,
+          transparent 75%,
+          transparent
+        );
+        background-size: 30px 30px;
+        border-radius: 50px;
+        transition: width 0.4s ease-in-out, background-color 0.4s;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+      }
+
+      .progress-text {
+        font-size: 1.2em;
+        font-weight: bold;
+        color: #34495e;
+        margin-top: 15px;
+        height: 20px; /* reserve space to prevent CLS */
+      }
     </style>
   </head>
   <body>
+    <!-- BREWING PROGRESS MODAL (NEW) -->
+    <div id="brewing-modal" class="modal">
+      <div class="modal-content">
+        <div class="progress-title">
+          ☕️
+          <span>Brewing Coffee...</span>
+        </div>
+        <div class="progress-bar-container">
+          <div id="progress-bar" class="progress-bar" style="width: 0%"></div>
+        </div>
+        <div id="progress-text" class="progress-text">0% Complete</div>
+        <p style="color: #7f8c8d; margin-top: 20px;">
+          Please wait while your perfect cup is being prepared.
+        </p>
+      </div>
+    </div>
+    <!-- END MODAL -->
+
     <div class="container">
       <h1>STM32 Real-Time Data (Node.js WebSocket)</h1>
       <p>
@@ -208,16 +313,18 @@
       const socket = io("http://127.0.0.1:5000");
 
       // --- MAPPING ARRAYS ---
+      // NOTE: STM32 States are: 0-4 (Selections), 5 (Safety Check), 6 (Shots), 7 (Summary), 8 (Brewing)
       const STATE_NAMES = [
         "Menu Selection",
         "Temperature Selection",
         "Coffee Beans Selection",
         "Tamping Level Selection",
         "Roast Level Selection",
-        "Safety",
-        "Shot Quantity Selection",
-        "Final Order Summary", // State 6
-        "Brewing", // State 7
+        "Safety Check (Roast Temp)", 
+        "Shot Quantity Selection", 
+        "Final Order Summary", 
+        "Brewing", // State 8
+        "Complete / Return to Menu", // State 9 (Placeholder for system returning to 0)
       ];
 
       const SELECTION_MAPS = {
@@ -242,8 +349,10 @@
         3: ["Very Light", "Light", "Medium", "Strong", "Very Strong"],
         // State 4: Roast Level Selection
         4: ["Light Roast", "Medium Roast", "Medium Dark Roast", "Dark Roast"],
-        // State 5: Shot Quantity Selection (Index 0 is 1 shot, index 9 is 10 shots)
-        5: [
+        // State 5: Safety Check (No user selection, handled by C code)
+        5: ["Confirm", "Go Back"],
+        // State 6: Shot Quantity Selection (Index 0 is 1 shot, index 9 is 10 shots)
+        6: [
           "1 Shot",
           "2 Shots",
           "3 Shots",
@@ -254,10 +363,14 @@
           "8 Shots",
           "9 Shots",
         ],
-        // State 6: Final Order Summary (Handled by special function)
-        6: "Review Complete",
-        // State 7: Brewing
-        7: "Brewing in Progress...",
+        // State 7: Final Order Summary
+        7: "Review Complete", 
+        
+        // State 8: Brewing
+        8: "Brewing in Progress...",
+        
+        // State 9: Complete (Temporary state)
+        9: "Process Complete",
       };
 
       // Safety Halt Index Mapping (for Summary Display)
@@ -275,8 +388,12 @@
       const rawStateIdSpan = document.getElementById("raw-state-id");
       const rawCounterIdSpan = document.getElementById("raw-counter-id");
       const safetyHaltSpan = document.getElementById("safety-halt");
-      // New DOM element for the choices list
       const availableChoicesDiv = document.getElementById("available-choices");
+
+      // NEW Modal Elements
+      const brewingModal = document.getElementById("brewing-modal");
+      const progressBar = document.getElementById("progress-bar");
+      const progressText = document.getElementById("progress-text");
 
       let lastSummaryData = null; // Store the last summary data
 
@@ -297,20 +414,62 @@
       socket.on("stm32_update", (data) => {
         console.log("RECEIVED STATE UPDATE:", data);
         updateDisplay(data);
+        
+        // 1. Modal Control
+        if (data.current_state === 8) {
+            brewingModal.style.display = "block";
+        } else if (data.current_state === 0) {
+             // Reset state and hide modal when returning to menu
+             brewingModal.style.display = "none";
+             progressBar.style.width = "0%";
+             progressBar.style.backgroundColor = "#3498db"; // Reset color
+             progressText.textContent = "0% Complete";
+        } else {
+            // Hide modal in all other non-brewing/non-reset states
+            brewingModal.style.display = "none";
+        }
       });
 
       socket.on("stm32_summary", (data) => {
         console.log("RECEIVED SUMMARY DATA:", data);
         lastSummaryData = data; // Store the summary
-        // Force the display update to ensure the state name and counter are correct
+        
+        // Force current_state to 7 (Summary State index)
         updateDisplay({
-          current_state: 6, // Force state to Summary
-          counter: 0, // Counter is irrelevant in summary state
-          safety_halt_released: data.is_safety_idx, // Use safety status from summary
+          current_state: 7, 
+          counter: 0, 
+          safety_halt_released: data.is_safety_idx, 
           timestamp: data.timestamp,
         });
-        // The renderChoices function will now detect state 6 and call renderSummary
       });
+
+      // NEW: Brewing progress handler
+      socket.on("brewing_progress", (data) => {
+        console.log("RECEIVED BREWING PROGRESS:", data);
+        const percentage = data.percentage;
+        
+        // Ensure modal is visible during progress updates
+        brewingModal.style.display = "block";
+
+        progressBar.style.width = `${percentage}%`;
+        
+        let message;
+        if (percentage < 10) {
+            message = "Grinding beans...";
+            progressBar.style.backgroundColor = "#e67e22"; // Orange for start
+        } else if (percentage > 0 && percentage < 100) {
+            message = `Brewing... (${percentage}%)`;
+            progressBar.style.backgroundColor = "#3498db"; // Blue for active
+        } else if (percentage === 100) {
+            message = "DONE! Enjoy your coffee! 😋";
+            progressBar.style.backgroundColor = "#2ecc71"; // Green for complete
+        } else {
+            message = `${percentage}% Complete`;
+        }
+
+        progressText.textContent = message;
+      });
+
 
       socket.on("log_message", (data) => {
         const msg = data.msg;
@@ -357,6 +516,7 @@
             selectionName = map;
           }
         } else {
+          // Handle states that don't have a map
           selectionName = `No Selection Map for State ${currentState}`;
         }
 
@@ -370,11 +530,11 @@
       function renderChoices(state, counter) {
         availableChoicesDiv.innerHTML = ""; // Clear previous content
 
-        // If we are in the Final Order Summary state (State 6) and have data, render the summary
-        if (state === 6 && lastSummaryData) {
+        // Check for State 7 (Summary State index) to trigger summary render
+        if (state === 7 && lastSummaryData) { 
           renderSummary(lastSummaryData);
           return;
-        } else if (state === 6) {
+        } else if (state === 7) { 
           availableChoicesDiv.innerHTML =
             '<p class="summary-title" style="color: #f39c12;">Awaiting Final Order Summary data...</p>';
           return;
@@ -387,7 +547,7 @@
         if (Array.isArray(map)) {
           choicesArray = map;
         } else if (typeof map === "string") {
-          // Handle static states (7: Brewing)
+          // Handle static states (8: Brewing, 9: Complete)
           availableChoicesDiv.innerHTML = `<p style="font-style: italic; color: #7f8c8d; text-align: center;">${map}</p>`;
           return;
         } else {
@@ -417,6 +577,7 @@
         const menuName = SELECTION_MAPS[0][summaryData.menu_idx] || "N/A";
         const tempName = SELECTION_MAPS[1][summaryData.temp_idx] || "N/A";
         const beanName = SELECTION_MAPS[2][summaryData.bean_idx] || "N/A";
+        // Tamping (State 3) is index 3 in SELECTION_MAPS
         const tampingName = SELECTION_MAPS[3][summaryData.tamping_idx] || "N/A";
         const roastName = SELECTION_MAPS[4][summaryData.roast_idx] || "N/A";
         const shots = summaryData.shots; // Already 1-indexed

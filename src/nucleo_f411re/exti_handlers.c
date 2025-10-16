@@ -15,22 +15,22 @@ volatile uint8_t safety_halt_released = 0;
 void send_summary_state(void)
 {
 
-    uint8_t menu_idx = state_selections[STATE_SELECT_MENUS];
-    uint8_t temp_idx = state_selections[STATE_SELECT_TEMP];
-    uint8_t bean_idx = state_selections[STATE_SELECT_BEAN];
-    uint8_t tamping_idx = state_selections[STATE_SELECT_TAMPING];
-    uint8_t is_safety_idx = state_selections[STATE_CHECK_ROAST_TEMP];
-    uint8_t roast_idx = state_selections[STATE_SELECT_ROAST];
-    uint8_t shots = state_selections[STATE_SELECT_SHOTS] + 1;
-    vdg_UART_TxString("[SUMMARYSTART]");
-    
-    // Updated format string to include spaces as requested in your last query
-    sprintf(stringOut, "%d, %d, %d, %d, %d, %d, %d", 
-            (int)menu_idx, (int)temp_idx, (int)bean_idx, 
-            (int)tamping_idx, (int)roast_idx, (int)is_safety_idx, (int)shots);
-            
-    vdg_UART_TxString(stringOut);
-    vdg_UART_TxString("[SUMMARYEND]");
+	uint8_t menu_idx = state_selections[STATE_SELECT_MENUS];
+	uint8_t temp_idx = state_selections[STATE_SELECT_TEMP];
+	uint8_t bean_idx = state_selections[STATE_SELECT_BEAN];
+	uint8_t tamping_idx = state_selections[STATE_SELECT_TAMPING];
+	uint8_t is_safety_idx = state_selections[STATE_CHECK_ROAST_TEMP];
+	uint8_t roast_idx = state_selections[STATE_SELECT_ROAST];
+	uint8_t shots = state_selections[STATE_SELECT_SHOTS] + 1;
+	vdg_UART_TxString("[SUMMARYSTART]");
+
+	// Updated format string to include spaces as requested in your last query
+	sprintf(stringOut, "%d, %d, %d, %d, %d, %d, %d",
+			(int)menu_idx, (int)temp_idx, (int)bean_idx,
+			(int)tamping_idx, (int)roast_idx, (int)is_safety_idx, (int)shots);
+
+	vdg_UART_TxString(stringOut);
+	vdg_UART_TxString("[SUMMARYEND]");
 }
 
 static void handle_confirm(void)
@@ -71,9 +71,15 @@ static void handle_confirm(void)
 		state_selections[current_state] = counter;
 	}
 
-	if (current_state < MAX_STATES)
+	if (current_state == STATE_SUMMARY)
 	{
-		current_state++;
+		vdg_UART_TxString("\r\n--- ORDER CONFIRMED: STARTING BREWING PROCESS ---\r\n");
+		vdg_UART_TxString("[STARTBREW]"); // Send the start brewing command
+	}
+
+	if (current_state < MAX_STATES) // 0,1,2,3,4,5,6,7
+	{
+		current_state++; // 1,2,3,4,5,6,7,8
 	}
 
 	const uint8_t prev_state = current_state - 1;
@@ -87,6 +93,7 @@ static void handle_confirm(void)
 		{
 			safety_halt_released = 0;
 			display(counter); // This will show the safety halt message
+			state_selections[STATE_CHECK_ROAST_TEMP] = 1;
 			send_current_state_via_uart();
 			return;
 		}
@@ -94,6 +101,7 @@ static void handle_confirm(void)
 		{
 			vdg_UART_TxString("\r\n--- TEMP CHECK PASSED: SKIPPING HALT & PROCEEDING TO SHOT QUANTITY (State 6) ---\r\n");
 			current_state = STATE_SELECT_SHOTS;
+			state_selections[STATE_CHECK_ROAST_TEMP] = 0;
 			counter = state_selections[current_state];
 		}
 	}
@@ -546,7 +554,7 @@ void display(uint8_t num)
 		sprintf(stringOut, "ROAST: %s\r\n", roast[roast_idx]);
 		vdg_UART_TxString(stringOut);
 		sprintf(stringOut, "SAFETY: %d\r\n", is_safety_idx);
-    vdg_UART_TxString(stringOut);
+		vdg_UART_TxString(stringOut);
 		sprintf(stringOut, "SHOTS: %d\r\n", shots);
 		vdg_UART_TxString(stringOut);
 		vdg_UART_TxString("\r\n========================================\r\n");
@@ -633,10 +641,12 @@ void brewCoffee(void)
 	vdg_UART_TxString("1. Checking bean availability... ");
 	if (!checkBeanAvailability(bean_idx, shots))
 	{
+		vdg_UART_TxString("[CHECKBEANSTART]");
 		vdg_UART_TxString("FAILED\r\n");
 		vdg_UART_TxString("ERROR: Insufficient beans.\r\n");
 		vdg_UART_TxString("Reason: Not enough coffee beans in inventory.\r\n");
 		vdg_UART_TxString("Returning to menu in 3 seconds...\r\n");
+		vdg_UART_TxString("[CHECKBEANEND]");
 
 		delay(3000);
 
@@ -646,17 +656,20 @@ void brewCoffee(void)
 		return;
 	}
 	vdg_UART_TxString("Weight pass\r\n");
+	vdg_UART_TxString("[CHECKBEANSTART_STATUS]PASS[CHECKBEANEND_STATUS]");
 
 	// 2. Check water level
 	sprintf(stringOut, "2. Checking water level (%dml)... ", water_level);
 	vdg_UART_TxString(stringOut);
 	if (!checkWaterLevel())
 	{
+		vdg_UART_TxString("[CHECKWATERSTART]");
 		vdg_UART_TxString("FAILED\r\n");
 		vdg_UART_TxString("ERROR: Insufficient water.\r\n");
 		sprintf(stringOut, "Reason: Water tank has %dml, need at least 250ml.\r\n", water_level);
 		vdg_UART_TxString(stringOut);
 		vdg_UART_TxString("Returning to menu in 3 seconds...\r\n");
+		vdg_UART_TxString("[CHECKWATEREND]");
 
 		delay(3000);
 
@@ -666,17 +679,20 @@ void brewCoffee(void)
 		return;
 	}
 	vdg_UART_TxString("Water pass\r\n");
+	vdg_UART_TxString("[CHECKWATERSTART_STATUS]PASS[CHECKWATEREND_STATUS]");
 
 	// 3. Check milk level
 	sprintf(stringOut, "3. Checking milk level (%dml)... ", milk_level);
 	vdg_UART_TxString(stringOut);
 	if (!checkMilkLevel())
 	{
+		vdg_UART_TxString("[CHECKMILKSTART]");
 		vdg_UART_TxString("FAILED\r\n");
 		vdg_UART_TxString("ERROR: Insufficient milk.\r\n");
 		sprintf(stringOut, "Reason: Milk container has %dml, need at least 150ml.\r\n", milk_level);
 		vdg_UART_TxString(stringOut);
 		vdg_UART_TxString("Returning to menu in 3 seconds...\r\n");
+		vdg_UART_TxString("[CHECKMILKEND]");
 
 		delay(3000);
 
@@ -686,17 +702,20 @@ void brewCoffee(void)
 		return;
 	}
 	vdg_UART_TxString("Milk pass\r\n");
+	vdg_UART_TxString("[CHECKMILKSTART_STATUS]PASS[CHECKMILKEND_STATUS]");
 
 	// 4. Check bean humidity
 	sprintf(stringOut, "4. Checking bean humidity (%d%%)... ", bean_humidity);
 	vdg_UART_TxString(stringOut);
 	if (!checkBeanHumidity())
 	{
+		vdg_UART_TxString("[CHECKBEANHUDIMITYSTART]");
 		vdg_UART_TxString("FAILED\r\n");
 		vdg_UART_TxString("ERROR: Bean humidity not ideal.\r\n");
 		sprintf(stringOut, "Reason: Humidity is %d%%, ideal range is 10-15%%.\r\n", bean_humidity);
 		vdg_UART_TxString(stringOut);
 		vdg_UART_TxString("Returning to menu in 3 seconds...\r\n");
+		vdg_UART_TxString("[CHECKBEANHUDIMITYEND]");
 
 		delay(3000);
 
@@ -706,17 +725,20 @@ void brewCoffee(void)
 		return;
 	}
 	vdg_UART_TxString("Humidity pass\r\n");
+	vdg_UART_TxString("[CHECKBEANHUMIDITYSTART_STATUS]PASS[CHECKBEANHUMIDITYEND_STATUS]");
 
 	// 5. Check brewing temperature
 	sprintf(stringOut, "5. Checking brewing temperature (%d°C)... ", brewing_temp);
 	vdg_UART_TxString(stringOut);
 	if (!checkBrewingTemperature())
 	{
+		vdg_UART_TxString("[CHECKBREWTEMPSTART]");
 		vdg_UART_TxString("FAILED\r\n");
 		vdg_UART_TxString("ERROR: Temperature not ideal.\r\n");
 		sprintf(stringOut, "Reason: Temperature is %d°C, ideal range is 90-96°C.\r\n", brewing_temp);
 		vdg_UART_TxString(stringOut);
 		vdg_UART_TxString("Returning to menu in 3 seconds...\r\n");
+		vdg_UART_TxString("[CHECKBREWTEMPEND]");
 
 		delay(3000);
 
@@ -726,6 +748,7 @@ void brewCoffee(void)
 		return;
 	}
 	vdg_UART_TxString("Temperature pass\r\n");
+	vdg_UART_TxString("[CHECKBREWTEMPSTART_STATUS]PASS[CHECKBREWTEMPEND_STATUS]");
 
 	vdg_UART_TxString("========================================\r\n");
 	vdg_UART_TxString("All checks passed!\r\n");
@@ -733,39 +756,29 @@ void brewCoffee(void)
 
 	// Brewing process
 	vdg_UART_TxString(">> Grinding coffee beans...\r\n");
-	delay(5000);
+	delay(1000); // Shorter delay for grinding
 
 	vdg_UART_TxString(">> Brewing coffee...\r\n");
-	char count_str[3];
+	// char count_str[5];
 	uint8_t max_number = 10;
 
 	for (int8_t count = max_number; count >= 0; count--)
 	{
-		OLED_Fill(0);
-
+		// Calculate percentage: 0, 10, 20... 100
 		uint8_t percentage = (max_number - count) * (100 / max_number);
 
-		OLED_DrawProgressBar(0, 56, SSD1306_WIDTH, 8, percentage);
+		// Send the percentage via UART with new tags
+		sprintf(stringOut, "[BREWINGPROGRESSSTART]%d[BREWINGPROGRESSEND]", percentage);
+		vdg_UART_TxString(stringOut);
 
-		snprintf(count_str, sizeof(count_str), "%d", count);
-
-		// Calculate X position to approximately center a single 8x8 digit.
-		// SSD1306_WIDTH is 128. FONT_WIDTH is 8.
-		// Center X = (128 / 2) - (8 / 2) = 64 - 4 = 60
-		uint8_t centered_x = 60;
-
-		// Line 2: The actual countdown number (Starts at y=16, which is page-aligned)
-		OLED_DrawString(centered_x, 24, count_str, 1);
-
-		OLED_UpdateScreen();
-
-		if (count > 0)
-		{
-			delay(1000); // Delay for 1 second
-		}
+		// Simulate brewing time
+		delay(50000);
 	}
 
 	vdg_UART_TxString(">> Coffee brewing complete!\r\n\r\n");
+	// Ensure 100% is sent one last time
+	sprintf(stringOut, "[BREWINGPROGRESSSTART]%d[BREWINGPROGRESSEND]", 100);
+	vdg_UART_TxString(stringOut);
 
 	// Calculate caffeine
 	uint16_t caffeine = calculateCaffeine(shots);
@@ -787,6 +800,9 @@ void brewCoffee(void)
 	sprintf(stringOut, "Milk remaining: %dml\r\n", milk_level);
 	vdg_UART_TxString(stringOut);
 
+	// New tag to indicate process completion
+	vdg_UART_TxString("[BREW_COMPLETE]");
+
 	vdg_UART_TxString("\r\nReturning to menu in 5 seconds...\r\n");
 
 	delay(5000);
@@ -796,5 +812,3 @@ void brewCoffee(void)
 	counter = 0;
 	showWelcomeMenu();
 }
-
-
