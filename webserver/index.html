@@ -1,256 +1,464 @@
 <!DOCTYPE html>
 <html lang="en">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>STM32 WebSocket Data Viewer</title>
     <!-- Use a specific, stable version -->
     <script src="https://cdnjs.cloudflare.com/ajax/libs/socket.io/4.1.2/socket.io.js"></script>
     <style>
-        body { font-family: sans-serif; margin: 0; padding: 20px; background-color: #f4f4f9; }
-        .container { max-width: 1200px; margin: 0 auto; background-color: #fff; padding: 20px; border-radius: 12px; box-shadow: 0 6px 12px rgba(0,0,0,0.1); }
-        h1 { color: #2c3e50; border-bottom: 2px solid #eee; padding-bottom: 10px; }
-        h2 { color: #34495e; margin-top: 20px; border-bottom: 1px solid #ddd; padding-bottom: 5px;}
-        
-        /* --- Two-Column Layout --- */
+      body {
+        font-family: "Inter", sans-serif;
+        margin: 0;
+        padding: 20px;
+        background-color: #f4f4f9;
+      }
+      .container {
+        max-width: 1200px;
+        margin: 0 auto;
+        background-color: #fff;
+        padding: 20px;
+        border-radius: 12px;
+        box-shadow: 0 6px 12px rgba(0, 0, 0, 0.1);
+      }
+      h1 {
+        color: #2c3e50;
+        border-bottom: 2px solid #eee;
+        padding-bottom: 10px;
+      }
+      h2 {
+        color: #34495e;
+        margin-top: 20px;
+        border-bottom: 1px solid #ddd;
+        padding-bottom: 5px;
+      }
+
+      /* --- Two-Column Layout --- */
+      .two-column-layout {
+        display: flex;
+        flex-direction: column;
+        gap: 20px;
+        margin-top: 20px;
+      }
+      @media (min-width: 768px) {
         .two-column-layout {
-            display: flex;
-            flex-direction: column;
-            gap: 20px;
-            margin-top: 20px;
+          flex-direction: row;
         }
-        @media (min-width: 768px) {
-            .two-column-layout {
-                flex-direction: row;
-            }
-        }
-        .two-column-layout > div {
-            flex: 1;
-            padding: 15px;
-            border-radius: 8px;
-            background-color: #ecf0f1;
-        }
-        /* --- /Two-Column Layout --- */
-        
-        .data-item { margin-bottom: 10px; padding: 10px; background-color: #e9ecef; border-radius: 4px; }
-        .data-item strong { display: inline-block; width: 200px; color: #007bff; }
-        .data-value { font-weight: bold; color: #333; }
-        #connection-status { font-weight: bold; }
-        #connection-status.connected { color: #27ae60; }
-        #connection-status.disconnected { color: #e74c3c; }
-        
-        /* Log Console */
-        #log-console { height: 120px; overflow-y: scroll; border: 1px solid #ccc; padding: 10px; background-color: #333; color: #0f0; font-family: monospace; border-radius: 4px; }
+      }
+      .two-column-layout > div {
+        flex: 1;
+        padding: 15px;
+        border-radius: 8px;
+        background-color: #ecf0f1;
+      }
+      /* --- /Two-Column Layout --- */
 
-        /* Choices List Styling */
-        #available-choices ul { list-style: none; padding-left: 0; }
-        #available-choices li {
-            padding: 10px 15px;
-            margin-bottom: 5px;
-            border-radius: 6px;
-            background-color: #f8f9fa;
-            transition: background-color 0.2s, box-shadow 0.2s;
-            border: 1px solid #ddd;
-        }
-        .selected-choice {
-            background-color: #3498db !important;
-            color: white;
-            font-weight: bold;
-            box-shadow: 0 2px 5px rgba(52, 152, 219, 0.5);
-            border-color: #2980b9;
-        }
+      .data-item {
+        margin-bottom: 10px;
+        padding: 10px;
+        background-color: #e9ecef;
+        border-radius: 4px;
+      }
+      .data-item strong {
+        display: inline-block;
+        width: 200px;
+        color: #007bff;
+      }
+      .data-value {
+        font-weight: bold;
+        color: #333;
+      }
+      #connection-status {
+        font-weight: bold;
+      }
+      #connection-status.connected {
+        color: #27ae60;
+      }
+      #connection-status.disconnected {
+        color: #e74c3c;
+      }
+
+      /* Log Console */
+      #log-console {
+        height: 120px;
+        overflow-y: scroll;
+        border: 1px solid #ccc;
+        padding: 10px;
+        background-color: #333;
+        color: #0f0;
+        font-family: monospace;
+        border-radius: 4px;
+      }
+
+      /* Choices List Styling (and Summary Styling) */
+      #available-choices ul {
+        list-style: none;
+        padding-left: 0;
+      }
+      #available-choices li {
+        padding: 10px 15px;
+        margin-bottom: 5px;
+        border-radius: 6px;
+        background-color: #f8f9fa;
+        transition: background-color 0.2s, box-shadow 0.2s;
+        border: 1px solid #ddd;
+      }
+      .selected-choice {
+        background-color: #3498db !important;
+        color: white;
+        font-weight: bold;
+        box-shadow: 0 2px 5px rgba(52, 152, 219, 0.5);
+        border-color: #2980b9;
+      }
+
+      /* Summary Styling */
+      .summary-title {
+        font-size: 1.5em;
+        color: #27ae60;
+        margin-bottom: 15px;
+        text-align: center;
+      }
+      .summary-item {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        padding: 12px;
+        border-bottom: 1px dashed #ccc;
+      }
+      .summary-label {
+        font-weight: 600;
+        color: #34495e;
+      }
+      .summary-value {
+        font-weight: bold;
+        color: #2c3e50;
+        background-color: #ecf0f1;
+        padding: 4px 8px;
+        border-radius: 4px;
+      }
     </style>
-</head>
-<body>
-
+  </head>
+  <body>
     <div class="container">
-        <h1>STM32 Real-Time Data (Node.js WebSocket)</h1>
-        <p>Status: <span id="connection-status" class="disconnected">Connecting...</span></p>
-        
-        <div class="two-column-layout">
-            
-            <!-- LEFT COLUMN: Status and Raw Data -->
-            <div id="left-column">
-                <h2>Current System Status</h2>
-                <div id="mapped-data-display">
-                    <div class="data-item"><strong>Current State Name:</strong> <span id="state-name" class="data-value">Awaiting data...</span></div>
-                    <div class="data-item"><strong>Current Selection:</strong> <span id="selection-name" class="data-value">Awaiting data...</span></div>
-                </div>
-                
-                <h2>Raw Data (IDs)</h2>
-                <div id="data-display">
-                    <div class="data-item"><strong>Current State (ID):</strong> <span id="raw-state-id" class="data-value">Awaiting data...</span></div>
-                    <div class="data-item"><strong>Counter Value (ID):</strong> <span id="raw-counter-id" class="data-value">Awaiting data...</span></div>
-                    <div class="data-item"><strong>Safety Halt Released:</strong> <span id="safety-halt" class="data-value">Awaiting data...</span></div>
-                </div>
-                
-                <div class="data-item"><strong>Last Update Received:</strong> <span id="last-updated">N/A</span></div>
-            </div>
+      <h1>STM32 Real-Time Data (Node.js WebSocket)</h1>
+      <p>
+        Status:
+        <span id="connection-status" class="disconnected">Connecting...</span>
+      </p>
 
-            <!-- RIGHT COLUMN: Available Choices -->
-            <div id="right-column">
-                <h2>Options for Current State</h2>
-                <div id="available-choices">
-                    <p>Select a state on the STM32 to load the available options here.</p>
-                </div>
+      <div class="two-column-layout">
+        <!-- LEFT COLUMN: Status and Raw Data -->
+        <div id="left-column">
+          <h2>Current System Status</h2>
+          <div id="mapped-data-display">
+            <div class="data-item">
+              <strong>Current State Name:</strong>
+              <span id="state-name" class="data-value">Awaiting data...</span>
             </div>
+            <div class="data-item">
+              <strong>Current Selection:</strong>
+              <span id="selection-name" class="data-value"
+                >Awaiting data...</span
+              >
+            </div>
+          </div>
 
+          <h2>Raw Data (IDs)</h2>
+          <div id="data-display">
+            <div class="data-item">
+              <strong>Current State (ID):</strong>
+              <span id="raw-state-id" class="data-value">Awaiting data...</span>
+            </div>
+            <div class="data-item">
+              <strong>Counter Value (ID):</strong>
+              <span id="raw-counter-id" class="data-value"
+                >Awaiting data...</span
+              >
+            </div>
+            <div class="data-item">
+              <strong>Safety Halt Released:</strong>
+              <span id="safety-halt" class="data-value">Awaiting data...</span>
+            </div>
+          </div>
+
+          <div class="data-item">
+            <strong>Last Update Received:</strong>
+            <span id="last-updated">N/A</span>
+          </div>
         </div>
 
-        <!-- LOG CONSOLE (Stays full width below columns) -->
-        <h2>STM32 UART Log</h2>
-        <div id="log-console"></div>
+        <!-- RIGHT COLUMN: Available Choices / Summary -->
+        <div id="right-column">
+          <h2>Options for Current State / Order Summary</h2>
+          <div id="available-choices">
+            <p>
+              Select a state on the STM32 to load the available options here.
+            </p>
+          </div>
+        </div>
+      </div>
+
+      <!-- LOG CONSOLE (Stays full width below columns) -->
+      <h2>STM32 UART Log</h2>
+      <div id="log-console"></div>
     </div>
 
     <script>
-        // Connect to the Node.js Socket.IO server running on localhost:5000
-        const socket = io('http://127.0.0.1:5000'); 
+      // Connect to the Node.js Socket.IO server running on localhost:5000
+      const socket = io("http://127.0.0.1:5000");
 
-        // --- MAPPING ARRAYS ---
-        const STATE_NAMES = [
-            "Menu Selection", "Temperature Selection", "Coffee Beans Selection", 
-            "Tamping Level Selection", "Roast Level Selection", "Shot Quantity Selection", 
-            "Final Order Summary", "Brewing"
-        ];
-        
-        const SELECTION_MAPS = {
-            // State 0: Menu Selection 
-            0: ["Espresso", "Americano", "Cappuccino", "Latte", "Mocha", 
-                "Macchiato", "Flat White", "Affogato", "Ristretto", "Lungo"],
-            // State 1: Temperature Selection 
-            1: ["Hot", "Cold", "Blended"],
-            // State 2: Coffee Beans Selection 
-            2: ["Arabica", "Robusta", "Liberica", "Excelsa", "Geisha", "Bourbon"],
-            // State 3: Tamping Level Selection 
-            3: ["Very Light", "Light", "Medium", "Strong", "Very Strong"],
-            // State 4: Roast Level Selection 
-            4: ["Light Roast", "Medium Roast", "Medium Dark Roast", "Dark Roast"],
-            // State 5: Shot Quantity Selection (Special: List of strings needed for display)
-            5: ["1 Shot", "2 Shots", "3 Shots", "4 Shots", "5 Shots", "6 Shots", "7 Shots", "8 Shots", "9 Shots", "10 Shots"],
-            // State 6: Final Order Summary 
-            6: "Review Complete", 
-            // State 7: Brewing 
-            7: "Brewing in Progress..."
-        };
+      // --- MAPPING ARRAYS ---
+      const STATE_NAMES = [
+        "Menu Selection",
+        "Temperature Selection",
+        "Coffee Beans Selection",
+        "Tamping Level Selection",
+        "Roast Level Selection",
+        "Safety",
+        "Shot Quantity Selection",
+        "Final Order Summary", // State 6
+        "Brewing", // State 7
+      ];
 
-        // --- DOM Elements ---
-        const lastUpdatedSpan = document.getElementById('last-updated');
-        const statusSpan = document.getElementById('connection-status');
-        const logConsole = document.getElementById('log-console');
-        const stateNameSpan = document.getElementById('state-name');
-        const selectionNameSpan = document.getElementById('selection-name');
-        const rawStateIdSpan = document.getElementById('raw-state-id');
-        const rawCounterIdSpan = document.getElementById('raw-counter-id');
-        const safetyHaltSpan = document.getElementById('safety-halt');
-        // New DOM element for the choices list
-        const availableChoicesDiv = document.getElementById('available-choices');
+      const SELECTION_MAPS = {
+        // State 0: Menu Selection
+        0: [
+          "Espresso",
+          "Americano",
+          "Cappuccino",
+          "Latte",
+          "Mocha",
+          "Macchiato",
+          "Flat White",
+          "Affogato",
+          "Ristretto",
+          "Lungo",
+        ],
+        // State 1: Temperature Selection
+        1: ["Hot", "Cold", "Blended"],
+        // State 2: Coffee Beans Selection
+        2: ["Arabica", "Robusta", "Liberica", "Excelsa", "Geisha", "Bourbon"],
+        // State 3: Tamping Level Selection
+        3: ["Very Light", "Light", "Medium", "Strong", "Very Strong"],
+        // State 4: Roast Level Selection
+        4: ["Light Roast", "Medium Roast", "Medium Dark Roast", "Dark Roast"],
+        // State 5: Shot Quantity Selection (Index 0 is 1 shot, index 9 is 10 shots)
+        5: [
+          "1 Shot",
+          "2 Shots",
+          "3 Shots",
+          "4 Shots",
+          "5 Shots",
+          "6 Shots",
+          "7 Shots",
+          "8 Shots",
+          "9 Shots",
+        ],
+        // State 6: Final Order Summary (Handled by special function)
+        6: "Review Complete",
+        // State 7: Brewing
+        7: "Brewing in Progress...",
+      };
 
+      // Safety Halt Index Mapping (for Summary Display)
+      const SAFETY_STATUS = {
+        0: "Passed (Safe)",
+        1: "Halt Acknowledged/Released",
+      };
 
-        // --- Socket.IO Event Handlers ---
-        socket.on('connect', () => {
-            statusSpan.textContent = 'Connected';
-            statusSpan.className = 'connected';
-            console.log('WebSocket Connected!');
+      // --- DOM Elements ---
+      const lastUpdatedSpan = document.getElementById("last-updated");
+      const statusSpan = document.getElementById("connection-status");
+      const logConsole = document.getElementById("log-console");
+      const stateNameSpan = document.getElementById("state-name");
+      const selectionNameSpan = document.getElementById("selection-name");
+      const rawStateIdSpan = document.getElementById("raw-state-id");
+      const rawCounterIdSpan = document.getElementById("raw-counter-id");
+      const safetyHaltSpan = document.getElementById("safety-halt");
+      // New DOM element for the choices list
+      const availableChoicesDiv = document.getElementById("available-choices");
+
+      let lastSummaryData = null; // Store the last summary data
+
+      // --- Socket.IO Event Handlers ---
+      socket.on("connect", () => {
+        statusSpan.textContent = "Connected";
+        statusSpan.className = "connected";
+        console.log("WebSocket Connected!");
+      });
+
+      socket.on("disconnect", () => {
+        statusSpan.textContent = "Disconnected";
+        statusSpan.className = "disconnected";
+        stateNameSpan.textContent = selectionNameSpan.textContent =
+          "Connection Lost";
+      });
+
+      socket.on("stm32_update", (data) => {
+        console.log("RECEIVED STATE UPDATE:", data);
+        updateDisplay(data);
+      });
+
+      socket.on("stm32_summary", (data) => {
+        console.log("RECEIVED SUMMARY DATA:", data);
+        lastSummaryData = data; // Store the summary
+        // Force the display update to ensure the state name and counter are correct
+        updateDisplay({
+          current_state: 6, // Force state to Summary
+          counter: 0, // Counter is irrelevant in summary state
+          safety_halt_released: data.is_safety_idx, // Use safety status from summary
+          timestamp: data.timestamp,
         });
+        // The renderChoices function will now detect state 6 and call renderSummary
+      });
 
-        socket.on('disconnect', () => {
-            statusSpan.textContent = 'Disconnected';
-            statusSpan.className = 'disconnected';
-            stateNameSpan.textContent = selectionNameSpan.textContent = 'Connection Lost';
-        });
+      socket.on("log_message", (data) => {
+        const msg = data.msg;
+        const logEntry = document.createElement("div");
+        logEntry.textContent = msg;
+        logConsole.appendChild(logEntry);
+        logConsole.scrollTop = logConsole.scrollHeight;
+      });
 
-        socket.on('stm32_update', (data) => {
-            console.log("RECEIVED DATA:", data); 
-            updateDisplay(data);
-        });
-        
-        socket.on('log_message', (data) => {
-            const msg = data.msg;
-            const logEntry = document.createElement('div');
-            logEntry.textContent = msg;
-            logConsole.appendChild(logEntry);
-            logConsole.scrollTop = logConsole.scrollHeight;
-        });
+      // --- UI Update Function ---
+      function updateDisplay(data) {
+        const currentState = data.current_state;
+        const counter = data.counter;
 
+        // 1. RAW Data Update
+        const lastUpdatedTime = new Date(
+          data.timestamp * 1000
+        ).toLocaleTimeString("en-US", { hour12: false });
+        lastUpdatedSpan.textContent = lastUpdatedTime;
+        rawStateIdSpan.textContent = currentState;
+        rawCounterIdSpan.textContent = counter;
 
-        // --- UI Update Function ---
-        function updateDisplay(data) {
-            
-            const currentState = data.current_state;
-            const counter = data.counter;
-            
-            // 1. RAW Data Update
-            const lastUpdatedTime = new Date(data.timestamp * 1000).toLocaleTimeString('en-US', {hour12: false});
-            lastUpdatedSpan.textContent = lastUpdatedTime;
-            rawStateIdSpan.textContent = currentState;
-            rawCounterIdSpan.textContent = counter;
+        safetyHaltSpan.textContent =
+          data.safety_halt_released === 1
+            ? "YES (1) - HALTED"
+            : "NO (0) - SAFE";
+        safetyHaltSpan.style.color =
+          data.safety_halt_released === 1 ? "#e74c3c" : "#27ae60";
 
-            safetyHaltSpan.textContent = data.safety_halt_released === 1 ? 'YES (1) - HALTED' : 'NO (0) - SAFE';
-            safetyHaltSpan.style.color = data.safety_halt_released === 1 ? '#e74c3c' : '#27ae60';
+        // 2. MAPPED/DESCRIPTIVE Data Update
 
+        // A. Current State Name
+        stateNameSpan.textContent =
+          STATE_NAMES[currentState] || `Unknown State (${currentState})`;
 
-            // 2. MAPPED/DESCRIPTIVE Data Update
-            
-            // A. Current State Name
-            stateNameSpan.textContent = STATE_NAMES[currentState] || `Unknown State (${currentState})`;
-            
-            // B. Current Selection Name
-            let selectionName = 'N/A';
-            const map = SELECTION_MAPS[currentState];
+        // B. Current Selection Name
+        let selectionName = "N/A";
+        const map = SELECTION_MAPS[currentState];
 
-            if (map) {
-                if (Array.isArray(map)) {
-                    selectionName = map[counter] || `Unknown Index (${counter})`;
-                } else {
-                    selectionName = map; 
-                }
-            } else {
-                selectionName = `No Selection Map for State ${currentState}`;
-            }
-
-            selectionNameSpan.textContent = selectionName;
-            
-            // 3. Render Available Choices in the right column
-            renderChoices(currentState, counter);
+        if (map) {
+          if (Array.isArray(map)) {
+            selectionName = map[counter] || `Unknown Index (${counter})`;
+          } else {
+            selectionName = map;
+          }
+        } else {
+          selectionName = `No Selection Map for State ${currentState}`;
         }
-        
-        // --- Choice Rendering Function ---
-        function renderChoices(state, counter) {
-            availableChoicesDiv.innerHTML = ''; // Clear previous content
 
-            const map = SELECTION_MAPS[state];
-            let choicesArray = [];
+        selectionNameSpan.textContent = selectionName;
 
-            // Identify which map to use for listing choices
-            if (Array.isArray(map)) {
-                choicesArray = map;
-            } else if (typeof map === 'string') {
-                // Handle static states (6: Summary, 7: Brewing)
-                availableChoicesDiv.innerHTML = `<p style="font-style: italic; color: #7f8c8d;">${map}</p>`;
-                return;
-            } else {
-                // Fallback for states with no definition
-                availableChoicesDiv.innerHTML = `<p style="font-style: italic; color: #7f8c8d;">No options to display for this state.</p>`;
-                return;
-            }
+        // 3. Render Available Choices/Summary in the right column
+        renderChoices(currentState, counter);
+      }
 
-            const ul = document.createElement('ul');
-            
-            choicesArray.forEach((choiceName, index) => {
-                const li = document.createElement('li');
-                li.textContent = choiceName;
+      // --- Choice Rendering Function ---
+      function renderChoices(state, counter) {
+        availableChoicesDiv.innerHTML = ""; // Clear previous content
 
-                // Check if the current choice index matches the received counter value
-                if (index === counter) {
-                    li.className = 'selected-choice';
-                }
-                ul.appendChild(li);
-            });
-
-            availableChoicesDiv.appendChild(ul);
+        // If we are in the Final Order Summary state (State 6) and have data, render the summary
+        if (state === 6 && lastSummaryData) {
+          renderSummary(lastSummaryData);
+          return;
+        } else if (state === 6) {
+          availableChoicesDiv.innerHTML =
+            '<p class="summary-title" style="color: #f39c12;">Awaiting Final Order Summary data...</p>';
+          return;
         }
 
+        const map = SELECTION_MAPS[state];
+        let choicesArray = [];
+
+        // Identify which map to use for listing choices
+        if (Array.isArray(map)) {
+          choicesArray = map;
+        } else if (typeof map === "string") {
+          // Handle static states (7: Brewing)
+          availableChoicesDiv.innerHTML = `<p style="font-style: italic; color: #7f8c8d; text-align: center;">${map}</p>`;
+          return;
+        } else {
+          // Fallback for states with no definition
+          availableChoicesDiv.innerHTML = `<p style="font-style: italic; color: #7f8c8d;">No options to display for this state.</p>`;
+          return;
+        }
+
+        const ul = document.createElement("ul");
+
+        choicesArray.forEach((choiceName, index) => {
+          const li = document.createElement("li");
+          li.textContent = choiceName;
+
+          // Check if the current choice index matches the received counter value
+          if (index === counter) {
+            li.className = "selected-choice";
+          }
+          ul.appendChild(li);
+        });
+
+        availableChoicesDiv.appendChild(ul);
+      }
+
+      // --- Summary Rendering Function (NEW) ---
+      function renderSummary(summaryData) {
+        const menuName = SELECTION_MAPS[0][summaryData.menu_idx] || "N/A";
+        const tempName = SELECTION_MAPS[1][summaryData.temp_idx] || "N/A";
+        const beanName = SELECTION_MAPS[2][summaryData.bean_idx] || "N/A";
+        const tampingName = SELECTION_MAPS[3][summaryData.tamping_idx] || "N/A";
+        const roastName = SELECTION_MAPS[4][summaryData.roast_idx] || "N/A";
+        const shots = summaryData.shots; // Already 1-indexed
+        const safetyStatus = SAFETY_STATUS[summaryData.is_safety_idx] || "N/A";
+
+        availableChoicesDiv.innerHTML = `
+                <div class="summary-title">Order Confirmed!</div>
+                <div class="summary-item">
+                    <span class="summary-label">Beverage Type:</span>
+                    <span class="summary-value">${menuName}</span>
+                </div>
+                <div class="summary-item">
+                    <span class="summary-label">Temperature:</span>
+                    <span class="summary-value">${tempName}</span>
+                </div>
+                <div class="summary-item">
+                    <span class="summary-label">Coffee Bean:</span>
+                    <span class="summary-value">${beanName}</span>
+                </div>
+                <div class="summary-item">
+                    <span class="summary-label">Roast Level:</span>
+                    <span class="summary-value">${roastName}</span>
+                </div>
+                <div class="summary-item">
+                    <span class="summary-label">Tamping Force:</span>
+                    <span class="summary-value">${tampingName}</span>
+                </div>
+                <div class="summary-item" style="border-bottom: none; margin-top: 10px; padding-bottom: 0;">
+                    <span class="summary-label" style="font-size: 1.1em; color: #e67e22;">Shot Quantity:</span>
+                    <span class="summary-value" style="font-size: 1.1em; background-color: #f1c40f;">${shots} ${
+          shots > 1 ? "Shots" : "Shot"
+        }</span>
+                </div>
+                <hr style="border: 0; border-top: 2px solid #bdc3c7; margin: 15px 0;">
+                <div class="summary-item">
+                    <span class="summary-label">Roast Temp Check:</span>
+                    <span class="summary-value" style="color: ${
+                      summaryData.is_safety_idx === 0 ? "#27ae60" : "#e74c3c"
+                    }; background-color: #fff; border: 1px solid currentColor;">${safetyStatus}</span>
+                </div>
+            `;
+      }
     </script>
-
-</body>
+  </body>
 </html>

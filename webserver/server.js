@@ -110,14 +110,15 @@ function setupSerialPort() {
                         // The summary has 6 indices: Menu, Temp, Bean, Tamping, Roast, Shots (pre-incremented)
                         const values = dataString.split(',').map(v => parseInt(v.trim(), 10));
                         
-                        if (values.length === 6 && !values.some(isNaN)) {
+                        if (values.length === 7 && !values.some(isNaN)) {
                             const summaryData = {
                                 "menu_idx": values[0],
                                 "temp_idx": values[1],
                                 "bean_idx": values[2],
                                 "tamping_idx": values[3],
                                 "roast_idx": values[4],
-                                "shots": values[5], // This is the final shot count (1-indexed)
+                                "is_safety_idx" : values[5],
+                                "shots": values[6], // This is the final shot count (1-indexed)
                                 "timestamp": Math.floor(Date.now() / 1000)
                             };
                             console.log(`[SUMMARY] Data parsed and EMITTED:`, summaryData);

@@ -12,27 +12,50 @@
 
 volatile uint8_t safety_halt_released = 0;
 
+void send_summary_state(void)
+{
+
+    uint8_t menu_idx = state_selections[STATE_SELECT_MENUS];
+    uint8_t temp_idx = state_selections[STATE_SELECT_TEMP];
+    uint8_t bean_idx = state_selections[STATE_SELECT_BEAN];
+    uint8_t tamping_idx = state_selections[STATE_SELECT_TAMPING];
+    uint8_t is_safety_idx = state_selections[STATE_CHECK_ROAST_TEMP];
+    uint8_t roast_idx = state_selections[STATE_SELECT_ROAST];
+    uint8_t shots = state_selections[STATE_SELECT_SHOTS] + 1;
+    vdg_UART_TxString("[SUMMARYSTART]");
+    
+    // Updated format string to include spaces as requested in your last query
+    sprintf(stringOut, "%d, %d, %d, %d, %d, %d, %d", 
+            (int)menu_idx, (int)temp_idx, (int)bean_idx, 
+            (int)tamping_idx, (int)roast_idx, (int)is_safety_idx, (int)shots);
+            
+    vdg_UART_TxString(stringOut);
+    vdg_UART_TxString("[SUMMARYEND]");
+}
+
 static void handle_confirm(void)
 {
-	if (checkRoastTemperatureSafety() == 1 && current_state == 5 && safety_halt_released == 0)
-	{
 
+	// Check if it state Check Temp and
+	if (current_state == STATE_CHECK_ROAST_TEMP && safety_halt_released == 0)
+	{
 		safety_halt_released = 1;
-		vdg_UART_TxString("\r\n--- HALT ACKNOWLEDGED: PROCEEDING TO QUANTITY SELECTION (State 5) ---\r\n");
+		vdg_UART_TxString("\r\n--- HALT ACKNOWLEDGED: PROCEEDING TO SHOT QUANTITY SELECTION (State 6) ---\r\n");
 
 		onLED1(false);
 		onLED2(false);
 		onLED3(false);
 		onLED4(false);
 
-		counter = 0;
+		current_state++;
+		counter = state_selections[current_state];
 		showStateOptions(current_state);
 		display(counter);
 		send_current_state_via_uart();
 		return;
 	}
 
-	if (current_state == 3) // Tamping state
+	if (current_state == STATE_SELECT_TAMPING) // Tamping state
 	{
 		// Use current ADC value to get tamping level
 		uint8_t tamping_level = getTampingLevel(adc_value); // Use the global ADC value updated by interrupt
@@ -43,34 +66,50 @@ static void handle_confirm(void)
 		vdg_UART_TxString(stringOut);
 		vdg_UART_TxString("========================================\r\n");
 	}
-	else
+	else if (current_state != STATE_CHECK_ROAST_TEMP)
 	{
 		state_selections[current_state] = counter;
 	}
 
-	if (current_state < 7)
+	if (current_state < MAX_STATES)
 	{
 		current_state++;
 	}
 
+	const uint8_t prev_state = current_state - 1;
+
 	counter = 0;
 
 	// Check for safety halt BEFORE showing options
-	if (current_state == 5 && checkRoastTemperatureSafety() == 1)
+	if (current_state == STATE_CHECK_ROAST_TEMP)
 	{
-		// Temperature is unsafe - trigger safety halt
-		safety_halt_released = 0;
-		display(counter); // This will show the safety halt message
-		send_current_state_via_uart();
-		return;
+		if (checkRoastTemperatureSafety() == 1)
+		{
+			safety_halt_released = 0;
+			display(counter); // This will show the safety halt message
+			send_current_state_via_uart();
+			return;
+		}
+		else
+		{
+			vdg_UART_TxString("\r\n--- TEMP CHECK PASSED: SKIPPING HALT & PROCEEDING TO SHOT QUANTITY (State 6) ---\r\n");
+			current_state = STATE_SELECT_SHOTS;
+			counter = state_selections[current_state];
+		}
 	}
 
-	if (current_state <= 5)
+	if (prev_state == STATE_SELECT_SHOTS)
+	{
+		vdg_UART_TxString("\r\n--- SELECTION COMPLETE: GENERATING ORDER SUMMARY ---\r\n");
+		send_summary_state();
+	}
+
+	if (current_state <= STATE_SELECT_SHOTS)
 	{
 		showStateOptions(current_state);
 	}
 
-	if (current_state != 3)
+	if (current_state != STATE_SELECT_TAMPING)
 	{
 		display(counter);
 		send_current_state_via_uart();
@@ -79,27 +118,23 @@ static void handle_confirm(void)
 
 static void handle_back(void)
 {
-	if (checkRoastTemperatureSafety() == 1 && current_state == 5)
+
+	if (current_state == STATE_CHECK_ROAST_TEMP && safety_halt_released == 0 && checkRoastTemperatureSafety() == 1)
 	{
-		if (safety_halt_released == 0)
-		{
-			safety_halt_released = 1;
-			vdg_UART_TxString("\r\n--- HALT ACKNOWLEDGED: Returning to Roast Selection (State 4) ---\r\n");
 
-			// Clear visual alerts
-			onLED1(false);
-			onLED2(false);
-			onLED3(false);
-			onLED4(false);
+		vdg_UART_TxString("\r\n--- HALT BYPASSED: Returning to Roast Selection (State 4) ---\r\n");
+		onLED1(false);
+		onLED2(false);
+		onLED3(false);
+		onLED4(false);
 
-			current_state = 4;
-			// Restore selection for state 4
-			counter = state_selections[current_state];
-			showStateOptions(current_state);
-			display(counter);
-			send_current_state_via_uart();
-			return;
-		}
+		current_state = STATE_SELECT_ROAST;
+		safety_halt_released = 1;
+		counter = state_selections[current_state];
+		showStateOptions(current_state);
+		display(counter);
+		send_current_state_via_uart();
+		return;
 	}
 
 	if (current_state > 0)
@@ -113,8 +148,20 @@ static void handle_back(void)
 
 		current_state--;
 
-		// Show options when going back (0-5)
-		if (current_state <= 5)
+		if (current_state == STATE_CHECK_ROAST_TEMP)
+		{
+			if (checkRoastTemperatureSafety() == 0)
+			{
+				vdg_UART_TxString("\r\n--- TEMP CHECK PASSED: SKIPPING HALT & RETURNING TO ROAST (State 4) ---\r\n");
+				current_state = STATE_SELECT_ROAST;
+			}
+			else
+			{
+				safety_halt_released = 0;
+			}
+		}
+
+		if (current_state <= STATE_SELECT_SHOTS)
 		{
 			showStateOptions(current_state);
 		}
@@ -135,7 +182,7 @@ void ADC_IRQHandler(void)
 		adc_ready = 1;
 
 		// Display real-time value when in tamping state
-		if (current_state == 3)
+		if (current_state == STATE_SELECT_TAMPING)
 		{
 			uint8_t tamping_level = getTampingLevel(adc_value);
 			const char *tamping_desc = getTampingDescription(tamping_level);
@@ -236,21 +283,6 @@ void send_current_state_via_uart(void)
 	vdg_UART_TxString("[DATAEND]\n");
 }
 
-void send_summary_state(void)
-{
-
-	uint8_t menu_idx = state_selections[0];
-	uint8_t temp_idx = state_selections[1];
-	uint8_t bean_idx = state_selections[2];
-	uint8_t tamping_idx = state_selections[3];
-	uint8_t roast_idx = state_selections[4];
-	uint8_t shots = state_selections[5] + 1;
-	vdg_UART_TxString("[SUMMARYSTART]");
-	sprintf(stringOut, "%d, %d, %d, %d, %d, %d", (int)menu_idx, (int)temp_idx, (int)bean_idx, (int)tamping_idx, (int)roast_idx, (int)shots);
-	vdg_UART_TxString(stringOut);
-	vdg_UART_TxString("[SUMMARYEND]");
-}
-
 void recommendMenuByLight(void)
 {
 	float light_lux = readLightIntensity();
@@ -318,7 +350,7 @@ void showWelcomeMenu(void)
 	vdg_UART_TxString("    COFFEE MAKER - MENU SELECTION\r\n");
 	vdg_UART_TxString("========================================\r\n");
 
-	for (uint8_t i = 0; i < 10; i++)
+	for (uint8_t i = 0; i < MAX_MENUS; i++)
 	{
 		sprintf(stringOut, "%d: %s\r\n", i, menu_names[i]);
 		vdg_UART_TxString(stringOut);
@@ -339,32 +371,32 @@ void showStateOptions(uint8_t state)
 {
 	switch (state)
 	{
-	case 0:
+	case STATE_SELECT_MENUS:
 		showWelcomeMenu();
 		break;
-	case 1:
+	case STATE_SELECT_TEMP:
 		vdg_UART_TxString("\r\n========================================\r\n");
 		vdg_UART_TxString("    TEMPERATURE SELECTION\r\n");
 		vdg_UART_TxString("========================================\r\n");
-		for (uint8_t i = 0; i <= 2; i++)
+		for (uint8_t i = 0; i < MAX_TEMP_TYPES; i++)
 		{
 			sprintf(stringOut, "%d: %s\r\n", i, temp_types[i]);
 			vdg_UART_TxString(stringOut);
 		}
 		vdg_UART_TxString("========================================\r\n\r\n");
 		break;
-	case 2:
+	case STATE_SELECT_BEAN:
 		vdg_UART_TxString("\r\n========================================\r\n");
 		vdg_UART_TxString("    COFFEE BEANS SELECTION\r\n");
 		vdg_UART_TxString("========================================\r\n");
-		for (uint8_t i = 0; i <= 5; i++)
+		for (uint8_t i = 0; i < MAX_BEAN_TYPES; i++)
 		{
 			sprintf(stringOut, "%d: %s (%dg available)\r\n", i, bean_varieties[i], bean_weights[i]);
 			vdg_UART_TxString(stringOut);
 		}
 		vdg_UART_TxString("========================================\r\n\r\n");
 		break;
-	case 3:
+	case STATE_SELECT_TAMPING:
 		vdg_UART_TxString("\r\n========================================\r\n");
 		vdg_UART_TxString("    TAMPING LEVEL SELECTION\r\n");
 		vdg_UART_TxString("========================================\r\n");
@@ -372,29 +404,32 @@ void showStateOptions(uint8_t state)
 		vdg_UART_TxString("Press PB5 to confirm your selection\r\n");
 		vdg_UART_TxString("========================================\r\n");
 		vdg_UART_TxString("Tamping Levels:\r\n");
-		for (uint8_t i = 0; i < 5; i++)
+		for (uint8_t i = 0; i < MAX_TAMPING; i++)
 		{
 			sprintf(stringOut, "  %d: %s\r\n", i, tamping_levels[i]);
 			vdg_UART_TxString(stringOut);
 		}
 		vdg_UART_TxString("========================================\r\n\r\n");
 		break;
-	case 4:
+	case STATE_SELECT_ROAST:
 		vdg_UART_TxString("\r\n========================================\r\n");
 		vdg_UART_TxString("    ROAST LEVEL SELECTION\r\n");
 		vdg_UART_TxString("========================================\r\n");
-		for (uint8_t i = 0; i <= 3; i++)
+		for (uint8_t i = 0; i < MAX_ROAST_TYPE; i++)
 		{
 			sprintf(stringOut, "%d: %s\r\n", i, roast[i]);
 			vdg_UART_TxString(stringOut);
 		}
 		vdg_UART_TxString("========================================\r\n\r\n");
 		break;
-	case 5:
+	case STATE_CHECK_ROAST_TEMP:
+		vdg_UART_TxString("\r\n[SYSTEM CHECK] Entering Roast Safety Check (State 5)...\r\n");
+		break;
+	case STATE_SELECT_SHOTS:
 		vdg_UART_TxString("\r\n========================================\r\n");
 		vdg_UART_TxString("    SHOT QUANTITY SELECTION\r\n");
 		vdg_UART_TxString("========================================\r\n");
-		for (uint8_t i = 0; i <= 8; i++)
+		for (uint8_t i = 0; i < MAX_SHOTS; i++)
 		{
 			sprintf(stringOut, "%d: %d shot(s) (%dg beans)\r\n", i, i + 1, 1 + i);
 			vdg_UART_TxString(stringOut);
@@ -429,19 +464,19 @@ void display(uint8_t num)
 	// Display message based on current state
 	switch (current_state)
 	{
-	case 0:
+	case STATE_SELECT_MENUS:
 		sprintf(stringOut, "[Menu Selection] %d: %s\r\n",
 				(uint16_t)counter, menu_names[counter]);
 		break;
-	case 1:
+	case STATE_SELECT_TEMP:
 		sprintf(stringOut, "[Temperature] %d: %s\r\n",
 				(uint16_t)counter, temp_types[counter]);
 		break;
-	case 2:
+	case STATE_SELECT_BEAN:
 		sprintf(stringOut, "[Coffee Beans] %d: %s\r\n",
 				(uint16_t)counter, bean_varieties[counter]);
 		break;
-	case 3:
+	case STATE_SELECT_TAMPING:
 	{
 		// Tamping state - read potentiometer and display real-time
 		uint16_t adc_value = readPotentiometer();
@@ -452,41 +487,50 @@ void display(uint8_t num)
 				adc_value, tamping_levels[tamping_level], tamping_desc);
 		break;
 	}
-	case 4:
+	case STATE_SELECT_ROAST:
 		sprintf(stringOut, "[Roast] %s\r\n",
 				roast[counter]);
 		break;
-	case 5:
+	case STATE_CHECK_ROAST_TEMP: // NEW State 5: Roast Safety Check
 		if (checkRoastTemperatureSafety() == 1 && safety_halt_released == 0)
 		{
-	
+			// Safety halt active
 			sprintf(stringOut, "!!! SAFETY HALT !!! Temp too high for %s. Acknowledge to proceed.\r\n", roast[state_selections[4]]);
 			vdg_UART_TxString(stringOut);
 			vdg_UART_TxString("========================================\r\n");
-			vdg_UART_TxString("  PB5  - Confirm/Proceed\r\n");
+			vdg_UART_TxString("  PB5  - Confirm/Proceed to Shots\r\n");
 			vdg_UART_TxString("  PB4  - Back to Roast\r\n");
 			vdg_UART_TxString("========================================\r\n\r\n");
+			// Turn on visual alerts
+			onLED1(true);
+			onLED2(true);
+			onLED3(true);
+			onLED4(true);
 			return;
 		}
 		else
 		{
-			// SAFE TO PROCEED: Display the current selection for State 5 (Strength/Quantity)
-			onLED1(false);
-			onLED2(false);
-			onLED3(false);
-			onLED4(false);
-			sprintf(stringOut, "[Strength/Quantity] Shots: %d\r\n",
-					(uint16_t)counter + 1);
+			// Should be handled by skip logic in handle_confirm, but just in case
+			sprintf(stringOut, "[Safety Check] PASSED or HALT ACKNOWLEDGED. Proceeding...\r\n");
 		}
 		break;
-	case 6:
+	case STATE_SELECT_SHOTS:
+		onLED1(false);
+		onLED2(false);
+		onLED3(false);
+		onLED4(false);
+		sprintf(stringOut, "[Strength/Quantity] Shots: %d\r\n",
+				(uint16_t)counter + 1);
+		break;
+	case STATE_SUMMARY:
 	{
-		uint8_t menu_idx = state_selections[0];
-		uint8_t temp_idx = state_selections[1];
-		uint8_t bean_idx = state_selections[2];
-		uint8_t tamping_idx = state_selections[3];
-		uint8_t roast_idx = state_selections[4];
-		uint8_t shots = state_selections[5] + 1;
+		uint8_t menu_idx = state_selections[STATE_SELECT_MENUS];
+		uint8_t temp_idx = state_selections[STATE_SELECT_TEMP];
+		uint8_t bean_idx = state_selections[STATE_SELECT_BEAN];
+		uint8_t tamping_idx = state_selections[STATE_SELECT_TAMPING];
+		uint8_t roast_idx = state_selections[STATE_SELECT_ROAST];
+		uint8_t is_safety_idx = state_selections[STATE_CHECK_ROAST_TEMP];
+		uint8_t shots = state_selections[STATE_SELECT_SHOTS] + 1;
 
 		vdg_UART_TxString("\r\n========================================\r\n");
 		vdg_UART_TxString("         FINAL ORDER SUMMARY\r\n");
@@ -501,6 +545,8 @@ void display(uint8_t num)
 		vdg_UART_TxString(stringOut);
 		sprintf(stringOut, "ROAST: %s\r\n", roast[roast_idx]);
 		vdg_UART_TxString(stringOut);
+		sprintf(stringOut, "SAFETY: %d\r\n", is_safety_idx);
+    vdg_UART_TxString(stringOut);
 		sprintf(stringOut, "SHOTS: %d\r\n", shots);
 		vdg_UART_TxString(stringOut);
 		vdg_UART_TxString("\r\n========================================\r\n");
@@ -536,7 +582,7 @@ void display(uint8_t num)
 		}
 	}
 	break;
-	case 7:
+	case STATE_BREW_COFFEE:
 		brewCoffee();
 		break;
 	default:
@@ -544,7 +590,7 @@ void display(uint8_t num)
 		break;
 	}
 
-	if (current_state != 6)
+	if (current_state != STATE_SUMMARY)
 	{
 		vdg_UART_TxString(stringOut);
 	}
@@ -557,7 +603,7 @@ void displayBeanWeights(void)
 	vdg_UART_TxString("      BEAN INVENTORY (grams)\r\n");
 	vdg_UART_TxString("========================================\r\n");
 
-	for (uint8_t i = 0; i < 6; i++)
+	for (uint8_t i = 0; i < MAX_BEAN_TYPES; i++)
 	{
 		sprintf(stringOut, "%s: %dg\r\n", bean_varieties[i], bean_weights[i]);
 		vdg_UART_TxString(stringOut);
@@ -576,8 +622,8 @@ uint16_t calculateCaffeine(uint8_t shots)
 // Main brewing process
 void brewCoffee(void)
 {
-	uint8_t bean_idx = state_selections[2];
-	uint8_t shots = state_selections[5] + 1;
+	uint8_t bean_idx = state_selections[STATE_SELECT_BEAN];
+	uint8_t shots = state_selections[STATE_SELECT_SHOTS] + 1;
 
 	vdg_UART_TxString("\r\n========================================\r\n");
 	vdg_UART_TxString("      BREWING SYSTEM CHECKS\r\n");
@@ -750,3 +796,5 @@ void brewCoffee(void)
 	counter = 0;
 	showWelcomeMenu();
 }
+
+

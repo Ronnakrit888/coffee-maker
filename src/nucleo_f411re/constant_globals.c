@@ -37,7 +37,7 @@ volatile uint8_t current_state = 0;
 
 char stringOut[128];
 
-volatile uint8_t bean_weights[MAX_BEAN_TYPES] = {5, 5, 5, 5, 5, 5};
+volatile uint8_t bean_weights[MAX_BEAN_TYPES] = {100, 100, 100, 100, 100, 100};
 
 // Temperature
 
@@ -55,6 +55,7 @@ const uint8_t state_max_limits[MAX_STATES] = {
 	MAX_BEAN_TYPES - 1,
 	MAX_TAMPING - 1,
 	MAX_ROAST_TYPE - 1,
+    MAX_IS_SAFETY - 1,
 	MAX_SHOTS - 1,
 	1,
 };
