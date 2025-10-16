@@ -38,6 +38,8 @@ const char *tamping_levels[MAX_TAMPING];
 const char *state_names[MAX_STATE_NAME];
 
 void delay(uint32_t ms);
+uint32_t millis(void);
+void setupSysTick(void);
 
 void setupFPU(void);
 

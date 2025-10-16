@@ -5,6 +5,8 @@
 #include "exti_handlers.h"
 #include "setup.h"
 #include "oled_driver.h"
+#include "state_globals.h"
+#include "sensor_stm32.h"
 
 void selectButton(void)
 {
@@ -61,6 +63,7 @@ int main(void)
 {
 
 	setupClock();
+	setupSysTick();
 	setupButton();
 	setupAnalog();
 	setupTemperature();
@@ -79,4 +82,32 @@ int main(void)
 	// Show welcome menu
 	showWelcomeMenu();
 	OLED_Init();
+
+	// Main loop - handle periodic tamping display
+	while (1)
+	{
+		// Check if we're in tamping state and need to update display
+		if (current_state == STATE_SELECT_TAMPING)
+		{
+			uint32_t current_time = millis();
+
+			// Display ONLY every 1 second (not when value changes)
+			if (current_time - last_tamping_display_time >= 1000)
+			{
+				uint8_t tamping_level = getTampingLevel(adc_value);
+				const char *tamping_desc = getTampingDescription(tamping_level);
+
+				sprintf(stringOut, "[Tamping] ADC: %d | Level: %s | Taste: %s\r\n",
+						adc_value, tamping_levels[tamping_level], tamping_desc);
+				vdg_UART_TxString(stringOut);
+
+				// Update display time and level
+				last_tamping_display_time = current_time;
+				last_tamping_level = tamping_level;
+			}
+		}
+
+		// Small delay to prevent CPU hogging (optional)
+		// Can be removed if you want maximum responsiveness
+	}
 }

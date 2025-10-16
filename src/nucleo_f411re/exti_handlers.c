@@ -65,6 +65,9 @@ static void handle_confirm(void)
 		sprintf(stringOut, "CONFIRMED: %s - %s\r\n", tamping_levels[tamping_level], getTampingDescription(tamping_level));
 		vdg_UART_TxString(stringOut);
 		vdg_UART_TxString("========================================\r\n");
+
+		// Stop continuous ADC conversion when leaving tamping state
+		ADC1->CR2 &= ~ADC_CR2_CONT;
 	}
 	else if (current_state != STATE_CHECK_ROAST_TEMP)
 	{
@@ -139,6 +142,12 @@ static void handle_back(void)
 
 	if (current_state > 0)
 	{
+		// Stop ADC conversion if leaving tamping state
+		if (current_state == STATE_SELECT_TAMPING)
+		{
+			ADC1->CR2 &= ~ADC_CR2_CONT;
+		}
+
 		// Show going back message
 		vdg_UART_TxString("\r\n========================================\r\n");
 		sprintf(stringOut, "Going back from [%s] to [%s]\r\n",
@@ -178,19 +187,12 @@ void ADC_IRQHandler(void)
 {
 	if ((ADC1->SR & ADC_SR_EOC) != 0)
 	{
+		// Just read the value - DO NOT print here to avoid blocking
 		adc_value = ADC1->DR;
 		adc_ready = 1;
 
-		// Display real-time value when in tamping state
-		if (current_state == STATE_SELECT_TAMPING)
-		{
-			uint8_t tamping_level = getTampingLevel(adc_value);
-			const char *tamping_desc = getTampingDescription(tamping_level);
-
-			sprintf(stringOut, "[Tamping] ADC: %d | Level: %s | Taste: %s\r\n",
-					adc_value, tamping_levels[tamping_level], tamping_desc);
-			vdg_UART_TxString(stringOut);
-		}
+		// Printing will be handled by a periodic task in main loop or by button events
+		// This keeps the interrupt handler fast and prevents system hang
 	}
 }
 
@@ -402,14 +404,27 @@ void showStateOptions(uint8_t state)
 		vdg_UART_TxString("========================================\r\n");
 		vdg_UART_TxString("Rotate potentiometer to adjust tamping\r\n");
 		vdg_UART_TxString("Press PB5 to confirm your selection\r\n");
+		vdg_UART_TxString("Press PB4 to go back\r\n");
 		vdg_UART_TxString("========================================\r\n");
-		vdg_UART_TxString("Tamping Levels:\r\n");
+		vdg_UART_TxString("Tamping Levels & Descriptions:\r\n");
 		for (uint8_t i = 0; i < MAX_TAMPING; i++)
 		{
-			sprintf(stringOut, "  %d: %s\r\n", i, tamping_levels[i]);
+			sprintf(stringOut, "  %d: %s - %s\r\n",
+					i, tamping_levels[i], getTampingDescription(i));
 			vdg_UART_TxString(stringOut);
 		}
+		vdg_UART_TxString("========================================\r\n");
+		vdg_UART_TxString("Real-time updates shown every 1 second\r\n");
+		vdg_UART_TxString("or when level changes...\r\n");
 		vdg_UART_TxString("========================================\r\n\r\n");
+
+		// Reset display timer when entering tamping state
+		last_tamping_display_time = 0;
+		last_tamping_level = 0xFF;
+
+		// Start continuous ADC conversion for potentiometer
+		ADC1->CR2 |= ADC_CR2_CONT;
+		ADC1->CR2 |= ADC_CR2_SWSTART;
 		break;
 	case STATE_SELECT_ROAST:
 		vdg_UART_TxString("\r\n========================================\r\n");
@@ -478,13 +493,14 @@ void display(uint8_t num)
 		break;
 	case STATE_SELECT_TAMPING:
 	{
-		// Tamping state - read potentiometer and display real-time
-		uint16_t adc_value = readPotentiometer();
+		// Tamping state - display current value from ADC interrupt
+		// The ADC interrupt handler updates the value automatically
 		uint8_t tamping_level = getTampingLevel(adc_value);
 		const char *tamping_desc = getTampingDescription(tamping_level);
 
-		sprintf(stringOut, "[Tamping] ADC: %d | Level: %s | Taste: %s\r\n",
-				adc_value, tamping_levels[tamping_level], tamping_desc);
+		// Note: Display is rate-limited by ADC_IRQHandler to prevent flooding
+		sprintf(stringOut, "[Tamping] Current: %s - %s (ADC: %d)\r\n",
+				tamping_levels[tamping_level], tamping_desc, adc_value);
 		break;
 	}
 	case STATE_SELECT_ROAST:
