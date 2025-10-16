@@ -38,5 +38,6 @@ void setupTemperature(void);
 void setupOLED(void);
 void setupPotentionmeter(void);
 void setupLightSensor(void);
+void setupFlameSensor(void);
 
 #endif

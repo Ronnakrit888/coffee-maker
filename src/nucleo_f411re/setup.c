@@ -126,3 +126,12 @@ void setupLightSensor(void)
 	// Note: ADC1 is already enabled by setupPotentionmeter()
 	// We just need to configure the channel when reading
 }
+
+void setupFlameSensor(void)
+{
+	// Configure PC5 as input with pull-up for flame sensor
+	GPIOC->MODER &= ~(GPIO_MODER_MODER5);
+	GPIOC->MODER |= (MY_GPIO_MODE_INPUT << GPIO_MODER_MODER5_Pos);
+	GPIOC->PUPDR &= ~(GPIO_PUPDR_PUPD5);
+	GPIOC->PUPDR |= (MY_GPIO_PULL_UP << GPIO_PUPDR_PUPD5_Pos);
+}
