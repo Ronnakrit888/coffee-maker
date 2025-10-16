@@ -5,11 +5,34 @@
 #include "setup.h"
 #include "oled_driver.h"
 
+// Millisecond counter for timekeeping
+volatile uint32_t systick_millis = 0;
+
 void delay(uint32_t ms)
 {
 	uint32_t threshold = ms * 133.333f;
 	for (uint32_t iter = 0; iter < threshold; iter++)
 		;
+}
+
+uint32_t millis(void)
+{
+	return systick_millis;
+}
+
+void setupSysTick(void)
+{
+	// Configure SysTick to trigger every 1ms
+	// Assuming 16MHz system clock (adjust if different)
+	SysTick->LOAD = 16000 - 1;  // 16MHz / 1000 = 16000 for 1ms
+	SysTick->VAL = 0;
+	SysTick->CTRL = SysTick_CTRL_CLKSOURCE_Msk | SysTick_CTRL_TICKINT_Msk | SysTick_CTRL_ENABLE_Msk;
+}
+
+// SysTick interrupt handler
+void SysTick_Handler(void)
+{
+	systick_millis++;
 }
 
 void setupFPU(void)
@@ -105,12 +128,19 @@ void setupPotentionmeter(void)
 
 	GPIOA->MODER &= ~(GPIO_MODER_MODER4);
 	GPIOA->MODER |= (MY_GPIO_MODE_ANALOG << GPIO_MODER_MODER4_Pos);
+
+	// ADC Configuration for Potentiometer (Channel 4)
 	ADC1->CR2 |= ADC_CR2_ADON;
 	ADC1->SMPR2 |= ADC_SMPR2_SMP4;
 	ADC1->SQR1 &= ~(ADC_SQR1_L);
 	ADC1->SQR3 &= ~(ADC_SQR3_SQ1);
 	ADC1->SQR3 |= (4 << ADC_SQR3_SQ1_Pos);
+
+	// Enable ADC interrupt
 	ADC1->CR1 |= ADC_CR1_EOCIE;
+
+	// Note: Continuous mode and conversion start will be controlled by tamping state
+	// to avoid interfering with other ADC channels (temperature, light sensor)
 
 	NVIC_EnableIRQ(18);
 	NVIC_SetPriority(18, 0);
