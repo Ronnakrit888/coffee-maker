@@ -77,39 +77,48 @@ void draw_welcome_screen(void)
 
 void draw_current_state()
 {
-	if (current_state != last_state)
-	{
-		sprintf(stringOut, "State: %d", (int)current_state);
+    if (current_state != last_state)
+    {
+        // ----------------------------------------------------
+        // FIX: Clear the areas where the state and percentage were drawn
+        // Clear State Text Line (Y=24)
+        OLED_ClearArea(0, 24, SSD1306_WIDTH, FONT_8X8_WIDTH, 0); // Clear to Black (0)
+        
+        // Clear Percentage Text Line (Y=48)
+        OLED_ClearArea(0, 48, SSD1306_WIDTH, FONT_8X8_WIDTH, 0); // Clear to Black (0)
+        // ----------------------------------------------------
 
-		uint8_t string_length = 0;
-		if (current_state <= 9)
-		{
-			string_length = 9 * FONT_8X8_WIDTH;
-		}
-		else
-		{
-			string_length = 10 * FONT_8X8_WIDTH;
-		};
+        sprintf(stringOut, "State: %d", (int)current_state);
 
-		uint8_t centered_state_x = (SSD1306_WIDTH / 2) - (string_length / 2);
+        uint8_t string_length = 0;
+        if (current_state <= 9)
+        {
+            string_length = 9 * FONT_8X8_WIDTH;
+        }
+        else
+        {
+            string_length = 10 * FONT_8X8_WIDTH;
+        };
 
-		// Y=24 is the third line (8, 16, 24)
-		OLED_DrawString(centered_state_x, 24, stringOut, 1);
+        uint8_t centered_state_x = (SSD1306_WIDTH / 2) - (string_length / 2);
 
-		uint8_t percentage = (uint8_t)(((float)current_state / MAX_STATES) * 100.0f);
+        // Y=24 is the third line (8, 16, 24)
+        OLED_DrawString(centered_state_x, 24, stringOut, 1);
 
-		if (current_state >= MAX_STATES)
-		{
-			percentage = 100;
-		}
+        uint8_t percentage = (uint8_t)(((float)current_state / MAX_STATES) * 100.0f);
 
-		sprintf(stringOut, "%d%%", percentage);
-		OLED_DrawString(centered_state_x, 48, stringOut, 1);
-		OLED_DrawProgressBar(0, 56, SSD1306_WIDTH, 8, percentage);
+        if (current_state >= MAX_STATES)
+        {
+            percentage = 100;
+        }
 
-		last_state = current_state;
-	}
-	OLED_UpdateScreen();
+        sprintf(stringOut, "%d%%", percentage);
+        OLED_DrawString(centered_state_x, 48, stringOut, 1);
+        OLED_DrawProgressBar(0, 56, SSD1306_WIDTH, 8, percentage);
+
+        last_state = current_state;
+    }
+    OLED_UpdateScreen();
 }
 
 int main(void)
