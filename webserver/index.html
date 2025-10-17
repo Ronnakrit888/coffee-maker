@@ -63,6 +63,12 @@
         background-color: #e9ecef;
         border-radius: 4px;
       }
+      /* Custom style for the recommendation section */
+      .recommendation-item {
+        background-color: #e8f5e9; /* Light green background */
+        border: 1px solid #c8e6c9; /* Subtle border */
+        font-weight: bold;
+      }
       .data-item strong {
         display: inline-block;
         width: 200px;
@@ -141,7 +147,7 @@
         border-radius: 4px;
       }
 
-      /* TAMPING SPECIFIC STYLES (NEW) */
+      /* TAMPING SPECIFIC STYLES */
       .tamping-data-block {
         background-color: #f7f9f9;
         border: 2px solid #3498db;
@@ -172,7 +178,7 @@
       }
       /* --- /TAMPING SPECIFIC STYLES --- */
 
-      /* --- MODAL STYLES (UPDATED) --- */
+      /* --- MODAL STYLES --- */
       .modal {
         display: none; /* Hidden by default */
         position: fixed;
@@ -313,6 +319,14 @@
                 >Awaiting data...</span
               >
             </div>
+
+            <!-- Light Sensor Data (KEPT ON LEFT) -->
+            <div class="data-item">
+              <strong>Light Intensity (Lux):</strong>
+              <span id="light-intensity-value" class="data-value"
+                >Awaiting data...</span
+              >
+            </div>
           </div>
 
           <h2>Raw Data (IDs)</h2>
@@ -341,6 +355,22 @@
 
         <!-- RIGHT COLUMN: Available Choices / Summary -->
         <div id="right-column">
+          
+          <!-- NEW: Recommended Menu (MOVED TO RIGHT) -->
+          <!-- WRAPPED IN A CONTAINER FOR CONDITIONAL HIDING -->
+          <div id="recommendation-container"> 
+            <h2>Smart Menu Recommendation</h2>
+            <div class="data-item recommendation-item" style="margin-bottom: 20px;">
+              <strong>Recommended Menu:</strong>
+              <span
+                id="recommendation-value"
+                class="data-value"
+                style="color: #2e7d32;"
+                >Awaiting light data...</span
+              >
+            </div>
+          </div>
+          
           <h2>Options for Current State / Order Summary</h2>
           <div id="available-choices">
             <p>
@@ -361,7 +391,7 @@
 
       // --- GLOBAL STATE ---
       let lastSummaryData = null; // Store the last summary data
-      let latestTampingData = null; // NEW: Store the last ADC data for real-time display
+      let latestTampingData = null; // Store the last ADC data for real-time display
 
       // --- MAPPING ARRAYS ---
       // NOTE: STM32 States are: 0-4 (Selections), 5 (Safety Check), 6 (Shots), 7 (Summary), 8 (Brewing)
@@ -458,7 +488,13 @@
       const safetyHaltSpan = document.getElementById("safety-halt");
       const availableChoicesDiv = document.getElementById("available-choices");
 
-      // NEW Modal Elements
+      // LIGHT ELEMENTS
+      const lightIntensitySpan = document.getElementById("light-intensity-value");
+      const recommendationSpan = document.getElementById("recommendation-value");
+      // NEW: Recommendation container for conditional visibility
+      const recommendationContainer = document.getElementById("recommendation-container");
+
+      // Modal Elements
       const brewingModal = document.getElementById("brewing-modal");
       const modalTitle = document.getElementById("progress-modal-title");
       const progressBar = document.getElementById("progress-bar");
@@ -506,7 +542,17 @@
         }
       });
 
-      // NEW: Tamping ADC Data Handler
+      // Light Data Handler
+      socket.on("stm32_light_data", (data) => {
+        // console.log("RECEIVED LIGHT DATA:", data); // Disabled to prevent excessive logging
+        // 1. Update Intensity (Left Column)
+        lightIntensitySpan.textContent = `${data.light_intensity} Lux`;
+        
+        // 2. Update Recommendation (Right Column)
+        recommendationSpan.textContent = data.recommendation;
+      });
+
+      // Tamping ADC Data Handler
       socket.on("stm32_tamping_data", (data) => {
         console.log("RECEIVED TAMPING ADC DATA:", data);
         latestTampingData = data; // Store the raw data
@@ -530,7 +576,7 @@
         });
       });
 
-      // UPDATED: Brewing progress handler to handle FAIL status
+      // Brewing progress handler to handle FAIL status
       socket.on("brewing_progress", (data) => {
         console.log("RECEIVED BREWING PROGRESS:", data);
 
@@ -625,7 +671,15 @@
 
         selectionNameSpan.textContent = selectionName;
 
-        // 3. Render Available Choices/Summary in the right column
+        // 3. Conditional Recommendation Visibility (NEW LOGIC)
+        // Hide recommendation if it is the Summary State (7) or Brewing State (8)
+        if (currentState > 0) {
+            recommendationContainer.style.display = 'none';
+        } else {
+            recommendationContainer.style.display = 'block';
+        }
+
+        // 4. Render Available Choices/Summary in the right column
         renderChoices(currentState, counter);
       }
 
@@ -669,7 +723,7 @@
           return;
         }
 
-        // NEW: Tamping State (State 3) requires special rendering
+        // Tamping State (State 3) requires special rendering
         if (state === 3) {
           if (latestTampingData) {
             // Render the real-time ADC data block first

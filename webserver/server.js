@@ -71,6 +71,9 @@ function setupSerialPort() {
                 const startTag = "[DATASTART]";
                 const endTag = "[DATAEND]";
 
+                const startLightTage = "[LIGHTSTART]";
+                const endLightTag = "[LIGHTEND]";
+
                 const startSummaryTag = "[SUMMARYSTART]";
                 const endSummaryTag = "[SUMMARYEND]";
 
@@ -107,6 +110,38 @@ function setupSerialPort() {
 
                     } catch (e) {
                         console.error(`[STATE] Error parsing data line: ${e}. Raw data: ${rawLine}`);
+                    }
+                }
+
+                else if (rawLine.includes(startLightTage) && rawLine.includes(endLightTag)) {
+                    try {
+                        const startIndex = rawLine.indexOf(startLightTage) + startLightTage.length;
+                        const endIndex = rawLine.indexOf(endLightTag);
+                        let dataString = rawLine.substring(startIndex, endIndex).trim();
+
+                        // The STM32 sends: %d (e.g., "4095")
+                        const cleanData = dataString.trim();
+
+                        const light_intensity = parseInt(cleanData, 10);
+
+                        // Correction: Check light_intensity instead of the undefined 'adc_value'
+                        if (!isNaN(light_intensity) && cleanData.length > 0) {
+                            const lightData = {
+                                "light_intensity": light_intensity,
+                                "timestamp": timestamp // Ensure timestamp is accessible (it appears to be)
+                            };
+
+                            // Emitting new structured data event
+                            io.emit('stm32_light_data', lightData);
+                            console.log(`[LIGHT DATA] Parsed and Emitted Intensity: ${light_intensity}`);
+                        } else {
+                            // If it doesn't parse to a valid number
+                            console.warn(`[LIGHT DATA] Warning: Invalid intensity format. Raw: ${dataString}`);
+                            io.emit('log_message', { msg: `[LIGHT Log - Corrupted] ${dataString}`, timestamp: timestamp });
+                        }
+                    } catch (e) {
+                        // The catch block can now safely access 'timestamp'
+                        console.error(`[LIGHT] Error parsing data line (Timestamp: ${timestamp}): ${e}. Raw data: ${rawLine}`);
                     }
                 }
 

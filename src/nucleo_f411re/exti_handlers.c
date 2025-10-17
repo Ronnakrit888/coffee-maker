@@ -305,11 +305,14 @@ void recommendMenuByLight(void)
 	vdg_UART_TxString("    SMART COFFEE RECOMMENDATION\r\n");
 	vdg_UART_TxString("========================================\r\n");
 
-	sprintf(stringOut, "Light Intensity: %d Lux\r\n", (uint16_t)light_lux);
+	// sprintf(stringOut, "Light Intensity: %d Lux\r\n", (uint16_t)light_lux);
+	vdg_UART_TxString("[LIGHTSTART]");
+	sprintf(stringOut, "%d",(uint16_t)light_lux);
 	vdg_UART_TxString(stringOut);
+	vdg_UART_TxString("[LIGHTEND]");
 
 	if (light_lux < 50.0f)
-	{
+	{	
 		vdg_UART_TxString("Time: Early Morning / Late Night\r\n");
 		vdg_UART_TxString("Recommended:\r\n");
 		vdg_UART_TxString("  - Espresso (Strong kick start)\r\n");
