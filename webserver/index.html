@@ -477,6 +477,20 @@
         return 4; // Very Strong
       }
 
+      function recommendMenuByLight(light_inten) {
+        if (light_inten < 50) {
+          return "Espresso | Ristretto | Americano"
+        } else if (light_inten < 200) {
+          return "Cappuccino | Latte | Flat White"
+        } else if (light_inten < 500) {
+          return "Mocha | Macchiato | Latte"
+        } else if (light_inten < 1000) {
+          return "Cold Americano | Iced Latte | Cold Cappuccino"
+        } else {
+          return "Blended Coffee | Cold Mocha | Affogato"
+        }
+      }
+
       // --- DOM Elements ---
       const lastUpdatedSpan = document.getElementById("last-updated");
       const statusSpan = document.getElementById("connection-status");
@@ -491,7 +505,7 @@
       // LIGHT ELEMENTS
       const lightIntensitySpan = document.getElementById("light-intensity-value");
       const recommendationSpan = document.getElementById("recommendation-value");
-      // NEW: Recommendation container for conditional visibility
+      // Recommendation container for conditional visibility
       const recommendationContainer = document.getElementById("recommendation-container");
 
       // Modal Elements
@@ -547,9 +561,8 @@
         // console.log("RECEIVED LIGHT DATA:", data); // Disabled to prevent excessive logging
         // 1. Update Intensity (Left Column)
         lightIntensitySpan.textContent = `${data.light_intensity} Lux`;
-        
-        // 2. Update Recommendation (Right Column)
-        recommendationSpan.textContent = data.recommendation;
+      
+        recommendationSpan.textContent = recommendMenuByLight(data.light_intensity);
       });
 
       // Tamping ADC Data Handler
@@ -558,8 +571,8 @@
         latestTampingData = data; // Store the raw data
         // If we are currently on the tamping screen (State 3), force a re-render
         if (rawStateIdSpan.textContent === "3") {
-          const currentCounter = parseInt(rawCounterIdSpan.textContent, 10);
-          renderChoices(3, currentCounter);
+          // We no longer need the counter for state 3 selection, only to trigger update
+          renderChoices(3, 0); // Pass a dummy counter
         }
       });
 
@@ -659,7 +672,11 @@
         const map = SELECTION_MAPS[currentState];
 
         if (map) {
-          if (Array.isArray(map)) {
+          // Special handling for State 3 (Tamping) since the selection is *external* (ADC)
+          if (currentState === 3 && latestTampingData) {
+             const tampingIndex = getTampingIndex(latestTampingData.adc_value);
+             selectionName = map[tampingIndex] || `Unknown Index (${tampingIndex})`;
+          } else if (Array.isArray(map)) {
             selectionName = map[counter] || `Unknown Index (${counter})`;
           } else {
             selectionName = map;
@@ -671,8 +688,8 @@
 
         selectionNameSpan.textContent = selectionName;
 
-        // 3. Conditional Recommendation Visibility (NEW LOGIC)
-        // Hide recommendation if it is the Summary State (7) or Brewing State (8)
+        // 3. Conditional Recommendation Visibility
+        // Hide recommendation if the state is anything other than the initial Menu Selection (State 0)
         if (currentState > 0) {
             recommendationContainer.style.display = 'none';
         } else {
@@ -683,7 +700,7 @@
         renderChoices(currentState, counter);
       }
 
-      // --- Tamping Data Renderer (NEW) ---
+      // --- Tamping Data Renderer (UPDATED: Removed selection prompt) ---
       function renderTampingData(adcValue) {
         const index = getTampingIndex(adcValue);
         const description = TAMPING_DESCRIPTION[index] || "N/A";
@@ -704,12 +721,10 @@
                         <span class="tamping-description-value">${description}</span>
                     </div>
                 </div>
-                <hr>
-                <p>Select your desired tamping level below:</p>
-            `;
+            `; // Removed <hr> and selection prompt
       }
 
-      // --- Choice Rendering Function (UPDATED) ---
+      // --- Choice Rendering Function (UPDATED: Added return for State 3) ---
       function renderChoices(state, counter) {
         availableChoicesDiv.innerHTML = ""; // Clear previous content
 
@@ -723,7 +738,7 @@
           return;
         }
 
-        // Tamping State (State 3) requires special rendering
+        // Tamping State (State 3) requires special rendering - now only shows ADC data
         if (state === 3) {
           if (latestTampingData) {
             // Render the real-time ADC data block first
@@ -732,9 +747,10 @@
             );
           } else {
             availableChoicesDiv.innerHTML +=
-              '<h3>Real-Time Tamping Feedback</h3><p style="font-style: italic; color: #7f8c8d;">Awaiting ADC data...</p><hr><p>Select your desired tamping level below:</p>';
+              '<h3>Real-Time Tamping Feedback</h3><p style="font-style: italic; color: #7f8c8d;">Awaiting ADC data...</p>';
           }
-          // Do NOT return here, continue to render the selectable list below
+          // IMPORTANT: Return here to skip rendering the selection list
+          return; 
         }
 
         const map = SELECTION_MAPS[state];

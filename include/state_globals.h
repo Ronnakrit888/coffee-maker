@@ -5,7 +5,7 @@
 
 extern volatile uint8_t counter;
 extern volatile uint8_t current_state;
-extern volatile int8_t last_state;
+extern volatile uint8_t last_state;
 extern char stringOut[];
 
 extern volatile uint8_t bean_weights[];

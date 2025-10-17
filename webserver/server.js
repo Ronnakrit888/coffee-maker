@@ -6,7 +6,7 @@ const { ReadlineParser } = require('@serialport/parser-readline');
 require('dotenv').config();
 
 // --- Configuration ---
-const SERIAL_PORT = process.env.SERIAL_PORT || '/dev/tty.usbmodem1403';
+const SERIAL_PORT = process.env.SERIAL_PORT || "/dev/tty.usbmodem11403";
 const BAUD_RATE = parseInt(process.env.BAUD_RATE) || 115200;
 const SERVER_PORT = parseInt(process.env.SERVER_PORT) || 5000;
 // ---------------------

@@ -59,7 +59,7 @@ void selectButton(void)
 	NVIC_SetPriority(EXTI4_IRQn, 1);
 }
 
-void draw_welcome_screen(int current_state)
+void draw_welcome_screen(void)
 {
 	// Make sure stringOut is declared outside the function or passed in if this is a function
 	// Example declaration: char stringOut[20];
@@ -72,24 +72,43 @@ void draw_welcome_screen(int current_state)
 	uint8_t centered_title_x = 16;
 
 	OLED_DrawString(centered_title_x, 8, "Coffee Maker", 1);
-	sprintf(stringOut, "State: %d", current_state);
+	OLED_UpdateScreen();
+}
 
-	uint8_t string_length = strlen(stringOut) * FONT_8X8_HEIGHT;
-	uint8_t centered_state_x = (SSD1306_WIDTH / 2) - (string_length / 2);
-
-	// Y=24 is the third line (8, 16, 24)
-	OLED_DrawString(centered_state_x, 24, stringOut, 1);
-
-	uint8_t percentage = (uint8_t)(((float)current_state / MAX_STATES) * 100.0f);
-
-	if (current_state >= MAX_STATES)
+void draw_current_state()
+{
+	if (current_state != last_state)
 	{
-		percentage = 100;
-	}
+		sprintf(stringOut, "State: %d", (int)current_state);
 
-	sprintf(stringOut, "%d%%", percentage);
-	OLED_DrawString(centered_state_x, 48, stringOut, 1);
-	OLED_DrawProgressBar(0, 56, SSD1306_WIDTH, 8, percentage);
+		uint8_t string_length = 0;
+		if (current_state <= 9)
+		{
+			string_length = 9 * FONT_8X8_WIDTH;
+		}
+		else
+		{
+			string_length = 10 * FONT_8X8_WIDTH;
+		};
+
+		uint8_t centered_state_x = (SSD1306_WIDTH / 2) - (string_length / 2);
+
+		// Y=24 is the third line (8, 16, 24)
+		OLED_DrawString(centered_state_x, 24, stringOut, 1);
+
+		uint8_t percentage = (uint8_t)(((float)current_state / MAX_STATES) * 100.0f);
+
+		if (current_state >= MAX_STATES)
+		{
+			percentage = 100;
+		}
+
+		sprintf(stringOut, "%d%%", percentage);
+		OLED_DrawString(centered_state_x, 48, stringOut, 1);
+		OLED_DrawProgressBar(0, 56, SSD1306_WIDTH, 8, percentage);
+
+		last_state = current_state;
+	}
 	OLED_UpdateScreen();
 }
 
@@ -119,8 +138,10 @@ int main(void)
 	OLED_Init();
 
 	// Main loop - handle periodic tamping display and error LED blinking
+	draw_welcome_screen();
 	while (1)
 	{
+		draw_current_state();
 		uint32_t current_time = millis();
 
 		// Handle LED blinking when in error state
@@ -140,8 +161,8 @@ int main(void)
 			// Display ONLY every 1 second (not when value changes)
 			if (current_time - last_tamping_display_time >= 1000)
 			{
-				uint8_t tamping_level = getTampingLevel(adc_value);
-				const char *tamping_desc = getTampingDescription(tamping_level);
+				// uint8_t tamping_level = getTampingLevel(adc_value);
+				// const char *tamping_desc = getTampingDescription(tamping_level);
 
 				sprintf(
 					stringOut,
@@ -152,7 +173,7 @@ int main(void)
 
 				// Update display time and level
 				last_tamping_display_time = current_time;
-				last_tamping_level = tamping_level;
+				// last_tamping_level = tamping_level;
 			}
 		}
 	}
