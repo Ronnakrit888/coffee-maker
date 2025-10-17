@@ -362,6 +362,66 @@ void OLED_DrawPixel(uint8_t x, uint8_t y, bool color)
     }
 }
 
+// NEW FUNCTION: Implements filling a rectangular area (or clearing it if color=0)
+void OLED_ClearArea(uint8_t x, uint8_t y, uint8_t width, uint8_t height, bool color)
+{
+    // Basic boundary checks and clipping
+    if (x >= SSD1306_WIDTH || y >= SSD1306_HEIGHT || width == 0 || height == 0) return;
+    if (x + width > SSD1306_WIDTH) width = SSD1306_WIDTH - x;
+    if (y + height > SSD1306_HEIGHT) height = SSD1306_HEIGHT - y;
+
+    uint8_t start_page = y / 8;
+    uint8_t end_page = (y + height - 1) / 8;
+    
+    // Iterate through pages
+    for (uint8_t page = start_page; page <= end_page; page++)
+    {
+        uint8_t mask = 0xFF; // Default mask: cover all 8 rows in the page
+
+        // 1. Calculate the mask for the current page
+        if (page == start_page) {
+            // Mask out bits *below* the starting row (y % 8)
+            mask &= (0xFF << (y % 8));
+        }
+
+        if (page == end_page) {
+            // Number of rows covered from the top of the end page
+            // (y + height) is the row *after* the last one to be drawn.
+            uint8_t end_row_after = (y + height) % 8; 
+            
+            // If the area is page-aligned at the bottom, end_row_after is 0, meaning we cover all 8 rows.
+            if (end_row_after == 0 && height > 0 && page == start_page + (end_page - start_page)) { 
+                end_row_after = 8;
+            } else if (end_row_after == 0) {
+                // If end_page is > start_page and end_row_after is 0, it means the whole page is covered.
+                // We use the default 0xFF mask, so no change needed here.
+            }
+            
+            // Create a mask that covers the rows up to end_row_after
+            uint8_t bottom_mask = (1 << end_row_after) - 1;
+            
+            // Combine with the start mask (if it's a single page)
+            mask &= bottom_mask;
+        }
+
+        // 2. Apply the mask across the columns
+        uint16_t base_index = (uint16_t)page * SSD1306_WIDTH;
+        for (uint8_t col = x; col < x + width; col++)
+        {
+            uint16_t index = base_index + col;
+
+            if (color) // Set to White (1)
+            {
+                SSD1306_Buffer[index] |= mask;
+            }
+            else // Clear to Black (0)
+            {
+                SSD1306_Buffer[index] &= ~mask;
+            }
+        }
+    }
+}
+
 
 void OLED_DrawChar(uint8_t x, uint8_t y, char ch, bool color)
 {
