@@ -6,9 +6,9 @@ const { ReadlineParser } = require('@serialport/parser-readline');
 require('dotenv').config();
 
 // --- Configuration ---
-const SERIAL_PORT = process.env.SERIAL_PORT || "/dev/tty.usbmodem11403";
+const SERIAL_PORT = process.env.SERIAL_PORT || "/dev/tty.usbmodem211203";
 const BAUD_RATE = parseInt(process.env.BAUD_RATE) || 115200;
-const SERVER_PORT = parseInt(process.env.SERVER_PORT) || 5000;
+const SERVER_PORT = parseInt(process.env.SERVER_PORT) || 5001;
 // ---------------------
 
 const app = express();
@@ -48,14 +48,14 @@ function setupSerialPort() {
         serialPort.on('error', (err) => {
             console.error('Serial Port Error:', err.message);
             // Attempt to re-establish connection after a delay
-            setTimeout(setupSerialPort, 5000);
+            setTimeout(setupSerialPort, 5001);
         });
 
         serialPort.on('close', () => {
             console.log('Serial Port Closed. Attempting to reconnect...');
             serialPort = null;
             parser = null;
-            setTimeout(setupSerialPort, 5000);
+            setTimeout(setupSerialPort, 5001);
         });
 
         // --- Data Parsing Logic ---
@@ -261,7 +261,7 @@ function setupSerialPort() {
 
     } catch (e) {
         console.error('Error creating SerialPort instance:', e.message);
-        setTimeout(setupSerialPort, 5000);
+        setTimeout(setupSerialPort, 5001);
     }
 }
 

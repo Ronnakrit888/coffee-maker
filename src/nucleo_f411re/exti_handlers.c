@@ -127,6 +127,11 @@ static void handle_confirm(void)
 		display(counter);
 		send_current_state_via_uart();
 	}
+	else
+	{
+		// For tamping state, send state update once when entering
+		send_current_state_via_uart();
+	}
 }
 
 static void handle_back(void)
@@ -977,4 +982,3 @@ void brewCoffee(void)
     counter = 0;
     showWelcomeMenu();
 }
-
