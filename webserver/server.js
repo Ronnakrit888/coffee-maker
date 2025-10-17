@@ -65,6 +65,9 @@ function setupSerialPort() {
             if (rawLine) {
                 console.log(`Received raw data: ${rawLine}`);
 
+                // CRITICAL FIX: Define timestamp here so it's available to ALL try/catch blocks
+                const timestamp = Math.floor(Date.now() / 1000);
+
                 const startTag = "[DATASTART]";
                 const endTag = "[DATAEND]";
 
@@ -94,7 +97,7 @@ function setupSerialPort() {
                                 "current_state": values[0],
                                 "counter": values[1],
                                 "safety_halt_released": values[2],
-                                "timestamp": Math.floor(Date.now() / 1000)
+                                "timestamp": timestamp // Use the shared timestamp
                             };
                             console.log(`[STATE] Data parsed and EMITTED:`, data);
                             io.emit('stm32_update', data);
@@ -126,7 +129,7 @@ function setupSerialPort() {
                                 "roast_idx": values[4],
                                 "is_safety_idx": values[5],
                                 "shots": values[6], // This is the final shot count (1-indexed)
-                                "timestamp": Math.floor(Date.now() / 1000)
+                                "timestamp": timestamp // Use the shared timestamp
                             };
                             console.log(`[SUMMARY] Data parsed and EMITTED:`, summaryData);
                             io.emit('stm32_summary', summaryData);
@@ -138,22 +141,40 @@ function setupSerialPort() {
                         console.error(`[SUMMARY] Error parsing data line: ${e}. Raw data: ${rawLine}`);
                     }
                 }
+
+                // 3. Parse Tamping Log (FIXED: Now handles one number and two strings)
                 else if (rawLine.includes(startTampingTag) && rawLine.includes(endTampingTag)) {
                     try {
                         const startIndex = rawLine.indexOf(startTampingTag) + startTampingTag.length;
                         const endIndex = rawLine.indexOf(endTampingTag);
                         dataString = rawLine.substring(startIndex, endIndex).trim();
 
-                        // The STM32 sends the detailed log message wrapped by the tags.
-                        const logMsg = dataString;
-                        io.emit('log_message', { msg: `[Tamping Log] ${logMsg}`, timestamp: timestamp });
-                        console.log(`[TAMPING LOG] Emitted: ${logMsg}`);
+                        // The STM32 sends: %d (e.g., "4095")
+                        const cleanData = dataString.trim();
+
+                        const adc_value = parseInt(cleanData, 10);
+
+                        if (!isNaN(adc_value) && cleanData.length > 0) {
+                            const tampingData = {
+                                "adc_value": adc_value,
+                                "timestamp": timestamp
+                            };
+
+                            // Emitting new structured data event
+                            io.emit('stm32_tamping_data', tampingData);
+                            console.log(`[TAMPING DATA] Parsed and Emitted ADC: ${adc_value}`);
+                        } else {
+                            // If it doesn't parse to a valid number
+                            console.warn(`[TAMPING DATA] Warning: Invalid ADC format. Raw: ${dataString}`);
+                            io.emit('log_message', { msg: `[Tamping Log - Corrupted] ${dataString}`, timestamp: timestamp });
+                        }
                     } catch (e) {
-                        console.error(`[TAMPING] Error parsing data line: ${e}. Raw data: ${rawLine}`);
+                        // The catch block can now safely access 'timestamp'
+                        console.error(`[TAMPING] Error parsing data line (Timestamp: ${timestamp}): ${e}. Raw data: ${rawLine}`);
                     }
                 }
 
-                // 3. UPDATED: Parse Brewing Progress Data (EXPECTS: step_id,step_percentage,global_percentage[,status])
+                // 4. Parse Brewing Progress Data (EXPECTS: step_id,step_percentage,global_percentage[,status])
                 else if (rawLine.includes(startProgressTag) && rawLine.includes(endProgressTag)) {
                     try {
                         const startIndex = rawLine.indexOf(startProgressTag) + startProgressTag.length;
@@ -180,7 +201,7 @@ function setupSerialPort() {
                                     global_percentage: globalPercentage,
                                     // Set status based on failure flag or 100% completion
                                     status: isFailure ? 'FAIL' : (percentage === 100 ? 'SUCCESS' : 'IN_PROGRESS'),
-                                    timestamp: Math.floor(Date.now() / 1000)
+                                    timestamp: timestamp // Use the shared timestamp
                                 };
                                 console.log(`[PROGRESS] Data parsed and EMITTED:`, progressData);
                                 io.emit('brewing_progress', progressData);
@@ -196,9 +217,9 @@ function setupSerialPort() {
                     }
                 }
 
-                // 4. Emit raw log messages
+                // 5. Emit raw log messages
                 else {
-                    io.emit('log_message', { msg: rawLine });
+                    io.emit('log_message', { msg: rawLine, timestamp: timestamp }); // Also add timestamp here
                 }
             }
         });

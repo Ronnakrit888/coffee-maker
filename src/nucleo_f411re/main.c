@@ -98,11 +98,12 @@ int main(void)
 				uint8_t tamping_level = getTampingLevel(adc_value);
 				const char *tamping_desc = getTampingDescription(tamping_level);
 
-				vdg_UART_TxString("[TAMPINGSTART]");
-				sprintf(stringOut, "[Tamping] ADC: %d | Level: %s | Taste: %s\r\n",
-						adc_value, tamping_levels[tamping_level], tamping_desc);
+				sprintf(
+					stringOut,
+					"[TAMPINGSTART]%d[TAMPINGEND]\r\n",
+					(int)adc_value);
+
 				vdg_UART_TxString(stringOut);
-				vdg_UART_TxString("[TAMPINGEND]");
 
 				// Update display time and level
 				last_tamping_display_time = current_time;
