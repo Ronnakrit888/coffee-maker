@@ -84,14 +84,25 @@ int main(void)
 	showWelcomeMenu();
 	OLED_Init();
 
-	// Main loop - handle periodic tamping display
+	// Main loop - handle periodic tamping display and error LED blinking
 	while (1)
 	{
+		uint32_t current_time = millis();
+
+		// Handle LED blinking when in error state
+		if (error_state_active)
+		{
+			// Blink every 200ms (fast blinking for urgency)
+			if (current_time - last_led_blink_time >= 200)
+			{
+				blinkAllLEDs();
+				last_led_blink_time = current_time;
+			}
+		}
+
 		// Check if we're in tamping state and need to update display
 		if (current_state == STATE_SELECT_TAMPING)
 		{
-			uint32_t current_time = millis();
-
 			// Display ONLY every 1 second (not when value changes)
 			if (current_time - last_tamping_display_time >= 1000)
 			{

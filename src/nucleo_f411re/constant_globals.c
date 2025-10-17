@@ -50,6 +50,10 @@ volatile uint8_t adc_ready = 0;
 volatile uint32_t last_tamping_display_time = 0;
 volatile uint8_t last_tamping_level = 0xFF; // Initialize to invalid value
 
+// Error state for LED blinking
+volatile uint8_t error_state_active = 0;
+volatile uint32_t last_led_blink_time = 0;
+
 volatile uint8_t state_selections[MAX_STATES] = {0};
 
 const uint8_t state_max_limits[MAX_STATES] = {

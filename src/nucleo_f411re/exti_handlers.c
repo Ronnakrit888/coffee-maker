@@ -40,8 +40,10 @@ static void handle_confirm(void)
 	if (current_state == STATE_CHECK_ROAST_TEMP && safety_halt_released == 0)
 	{
 		safety_halt_released = 1;
+		error_state_active = 0; // Clear error state
 		vdg_UART_TxString("\r\n--- HALT ACKNOWLEDGED: PROCEEDING TO SHOT QUANTITY SELECTION (State 6) ---\r\n");
 
+		// Turn off all LEDs
 		onLED1(false);
 		onLED2(false);
 		onLED3(false);
@@ -132,8 +134,10 @@ static void handle_back(void)
 
 	if (current_state == STATE_CHECK_ROAST_TEMP && safety_halt_released == 0 && checkRoastTemperatureSafety() == 1)
 	{
-
+		error_state_active = 0; // Clear error state
 		vdg_UART_TxString("\r\n--- HALT BYPASSED: Returning to Roast Selection (State 4) ---\r\n");
+
+		// Turn off all LEDs
 		onLED1(false);
 		onLED2(false);
 		onLED3(false);
@@ -523,18 +527,14 @@ void display(uint8_t num)
 	case STATE_CHECK_ROAST_TEMP: // NEW State 5: Roast Safety Check
 		if (checkRoastTemperatureSafety() == 1 && safety_halt_released == 0)
 		{
-			// Safety halt active
+			// Safety halt active - activate error state for LED blinking
+			error_state_active = 1;
 			sprintf(stringOut, "!!! SAFETY HALT !!! Temp too high for %s. Acknowledge to proceed.\r\n", roast[state_selections[4]]);
 			vdg_UART_TxString(stringOut);
 			vdg_UART_TxString("========================================\r\n");
 			vdg_UART_TxString("  PB5  - Confirm/Proceed to Shots\r\n");
 			vdg_UART_TxString("  PB4  - Back to Roast\r\n");
 			vdg_UART_TxString("========================================\r\n\r\n");
-			// Turn on visual alerts
-			onLED1(true);
-			onLED2(true);
-			onLED3(true);
-			onLED4(true);
 			return;
 		}
 		else
@@ -544,6 +544,8 @@ void display(uint8_t num)
 		}
 		break;
 	case STATE_SELECT_SHOTS:
+		// Make sure error state is cleared when entering shot selection
+		error_state_active = 0;
 		onLED1(false);
 		onLED2(false);
 		onLED3(false);

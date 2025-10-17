@@ -19,9 +19,13 @@ extern volatile uint8_t last_tamping_level;
 
 extern volatile uint8_t safety_halt_released;
 
+// Error state for LED blinking
+extern volatile uint8_t error_state_active;
+extern volatile uint32_t last_led_blink_time;
+
 extern uint16_t water_level;
 extern uint16_t milk_level;
-extern uint8_t bean_humidity; 
+extern uint8_t bean_humidity;
 extern uint8_t brewing_temp; 
 
 #endif

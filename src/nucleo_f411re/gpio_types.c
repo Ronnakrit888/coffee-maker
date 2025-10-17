@@ -55,3 +55,11 @@ void onLED4(bool isOn)
 {
     isOn ? (GPIOA->ODR |= GPIO_ODR_OD5) : (GPIOA->ODR &= ~GPIO_ODR_OD5);
 }
+
+void blinkAllLEDs(void)
+{
+    toggle_LED1();
+    toggle_LED2();
+    toggle_LED3();
+    toggle_LED4();
+}

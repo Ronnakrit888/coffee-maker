@@ -53,5 +53,6 @@ void toggle_LED1(void);
 void toggle_LED2(void);
 void toggle_LED3(void);
 void toggle_LED4(void);
+void blinkAllLEDs(void);
 
 #endif
