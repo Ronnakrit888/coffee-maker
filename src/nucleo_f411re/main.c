@@ -59,6 +59,40 @@ void selectButton(void)
 	NVIC_SetPriority(EXTI4_IRQn, 1);
 }
 
+void draw_welcome_screen(int current_state)
+{
+	// Make sure stringOut is declared outside the function or passed in if this is a function
+	// Example declaration: char stringOut[20];
+
+	showWelcomeMenu();
+	OLED_Init();
+
+	// 1. Title: "Coffee Maker" (Assuming 12 characters * 8 pixels/char = 96 pixels wide)
+	// Centering: (128 - 96) / 2 = 16
+	uint8_t centered_title_x = 16;
+
+	OLED_DrawString(centered_title_x, 8, "Coffee Maker", 1);
+	sprintf(stringOut, "State: %d", current_state);
+
+	uint8_t string_length = strlen(stringOut) * FONT_8X8_HEIGHT;
+	uint8_t centered_state_x = (SSD1306_WIDTH / 2) - (string_length / 2);
+
+	// Y=24 is the third line (8, 16, 24)
+	OLED_DrawString(centered_state_x, 24, stringOut, 1);
+
+	uint8_t percentage = (uint8_t)(((float)current_state / MAX_STATES) * 100.0f);
+
+	if (current_state >= MAX_STATES)
+	{
+		percentage = 100;
+	}
+
+	sprintf(stringOut, "%d%%", percentage);
+	OLED_DrawString(centered_state_x, 48, stringOut, 1);
+	OLED_DrawProgressBar(0, 56, SSD1306_WIDTH, 8, percentage);
+	OLED_UpdateScreen();
+}
+
 int main(void)
 {
 
@@ -109,8 +143,11 @@ int main(void)
 				uint8_t tamping_level = getTampingLevel(adc_value);
 				const char *tamping_desc = getTampingDescription(tamping_level);
 
-				sprintf(stringOut, "[Tamping] ADC: %d | Level: %s | Taste: %s\r\n",
-						adc_value, tamping_levels[tamping_level], tamping_desc);
+				sprintf(
+					stringOut,
+					"[TAMPINGSTART]%d[TAMPINGEND]\r\n",
+					(int)adc_value);
+
 				vdg_UART_TxString(stringOut);
 
 				// Update display time and level
@@ -118,8 +155,5 @@ int main(void)
 				last_tamping_level = tamping_level;
 			}
 		}
-
-		// Small delay to prevent CPU hogging (optional)
-		// Can be removed if you want maximum responsiveness
 	}
 }

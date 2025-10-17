@@ -141,6 +141,37 @@
         border-radius: 4px;
       }
 
+      /* TAMPING SPECIFIC STYLES (NEW) */
+      .tamping-data-block {
+        background-color: #f7f9f9;
+        border: 2px solid #3498db;
+        border-radius: 8px;
+        padding: 15px;
+        margin-bottom: 20px;
+      }
+      .tamping-item {
+        display: flex;
+        justify-content: space-between;
+        padding: 8px 0;
+        border-bottom: 1px solid #eee;
+      }
+      .tamping-item:last-child {
+        border-bottom: none;
+      }
+      .tamping-label {
+        font-weight: 600;
+        color: #2c3e50;
+      }
+      .tamping-value {
+        font-weight: bold;
+        color: #e67e22; /* Coffee color */
+      }
+      .tamping-description-value {
+        color: #27ae60;
+        font-style: italic;
+      }
+      /* --- /TAMPING SPECIFIC STYLES --- */
+
       /* --- MODAL STYLES (UPDATED) --- */
       .modal {
         display: none; /* Hidden by default */
@@ -224,7 +255,8 @@
         height: 20px; /* reserve space to prevent CLS */
       }
 
-      .progress-step-context { /* NEW STYLE */
+      .progress-step-context {
+        /* NEW STYLE */
         font-size: 0.9em;
         color: #7f8c8d;
         margin-bottom: 10px;
@@ -250,7 +282,7 @@
         </div>
         <!-- Note: This displays the main status text -->
         <div id="progress-text" class="progress-text">0% Complete</div>
-        <p style="color: #7f8c8d; margin-top: 20px;">
+        <p style="color: #7f8c8d; margin-top: 20px">
           <span id="progress-caption"
             >Please wait while your perfect cup is being prepared.</span
           >
@@ -327,6 +359,10 @@
       // Connect to the Node.js Socket.IO server running on localhost:5000
       const socket = io("http://127.0.0.1:5000");
 
+      // --- GLOBAL STATE ---
+      let lastSummaryData = null; // Store the last summary data
+      let latestTampingData = null; // NEW: Store the last ADC data for real-time display
+
       // --- MAPPING ARRAYS ---
       // NOTE: STM32 States are: 0-4 (Selections), 5 (Safety Check), 6 (Shots), 7 (Summary), 8 (Brewing)
       const STATE_NAMES = [
@@ -394,6 +430,23 @@
         1: "Halt Acknowledged/Released",
       };
 
+      const TAMPING_DESCRIPTION = [
+        "Mild, Delicate, Fruity Notes",
+        "Smooth, Balanced, Light Body",
+        "Rich, Full-bodied, Balanced",
+        "Bold, Intense, Strong Flavor",
+        "Very Bold, Robust, Maximum Extraction",
+      ];
+
+      // --- Tamping Logic Helper ---
+      function getTampingIndex(adc_value) {
+        if (adc_value < 820) return 0; // Very Light
+        if (adc_value < 1639) return 1; // Light
+        if (adc_value < 2458) return 2; // Medium
+        if (adc_value < 3277) return 3; // Strong
+        return 4; // Very Strong
+      }
+
       // --- DOM Elements ---
       const lastUpdatedSpan = document.getElementById("last-updated");
       const statusSpan = document.getElementById("connection-status");
@@ -414,8 +467,6 @@
       const progressStepContext = document.getElementById(
         "progress-step-context"
       );
-
-      let lastSummaryData = null; // Store the last summary data
 
       // --- Socket.IO Event Handlers ---
       socket.on("connect", () => {
@@ -444,7 +495,7 @@
           // Reset modal appearance
           progressBar.style.width = "0%";
           progressBar.style.backgroundColor = "#3498db";
-          modalTitle.innerHTML = '☕️<span>Brewing Coffee...</span>';
+          modalTitle.innerHTML = "☕️<span>Brewing Coffee...</span>";
           progressText.textContent = "0% Complete";
           progressCaption.textContent =
             "Please wait while your perfect cup is being prepared.";
@@ -452,6 +503,17 @@
         } else {
           // Hide modal in all other non-brewing/non-reset states
           brewingModal.style.display = "none";
+        }
+      });
+
+      // NEW: Tamping ADC Data Handler
+      socket.on("stm32_tamping_data", (data) => {
+        console.log("RECEIVED TAMPING ADC DATA:", data);
+        latestTampingData = data; // Store the raw data
+        // If we are currently on the tamping screen (State 3), force a re-render
+        if (rawStateIdSpan.textContent === "3") {
+          const currentCounter = parseInt(rawCounterIdSpan.textContent, 10);
+          renderChoices(3, currentCounter);
         }
       });
 
@@ -479,16 +541,15 @@
 
         // Ensure modal is visible during progress updates
         brewingModal.style.display = "block";
-        
+
         // Always show the current step context
         progressStepContext.textContent = `Step: ${stepId.toUpperCase()}`;
-
 
         if (status === "FAIL") {
           // --- FAILURE STATE ---
           progressBar.style.width = `100%`; // Visually full bar to show the error point
           progressBar.style.backgroundColor = "#e74c3c"; // Red for failure
-          modalTitle.innerHTML = '❌<span>Brewing Failed!</span>';
+          modalTitle.innerHTML = "❌<span>Brewing Failed!</span>";
           progressText.textContent = `ERROR: Failed during ${stepId.toUpperCase()} check.`;
           progressCaption.textContent =
             "See the STM32 UART Log below for the specific reason.";
@@ -496,18 +557,17 @@
           // --- FINAL SUCCESS STATE ---
           progressBar.style.width = `100%`;
           progressBar.style.backgroundColor = "#2ecc71"; // Green
-          modalTitle.innerHTML = '✅<span>Completed!</span>';
+          modalTitle.innerHTML = "✅<span>Completed!</span>";
           progressText.textContent = "DONE! Enjoy your perfect cup! 😋";
-          progressCaption.textContent =
-            "Returning to the main menu shortly.";
+          progressCaption.textContent = "Returning to the main menu shortly.";
         } else {
           // --- IN_PROGRESS STATE ---
           progressBar.style.width = `${globalPercentage}%`;
           // Color coding: Orange for Pre-Checks (0-25%), Blue for Grinding/Brewing (25%-100%)
           progressBar.style.backgroundColor =
             globalPercentage <= 25 ? "#e67e22" : "#3498db";
-          modalTitle.innerHTML = '☕️<span>Brewing Coffee...</span>';
-          
+          modalTitle.innerHTML = "☕️<span>Brewing Coffee...</span>";
+
           progressText.textContent = `Global Progress: ${globalPercentage}%`;
           progressCaption.textContent =
             "Please wait while your perfect cup is being prepared.";
@@ -569,7 +629,33 @@
         renderChoices(currentState, counter);
       }
 
-      // --- Choice Rendering Function ---
+      // --- Tamping Data Renderer (NEW) ---
+      function renderTampingData(adcValue) {
+        const index = getTampingIndex(adcValue);
+        const description = TAMPING_DESCRIPTION[index] || "N/A";
+
+        return `
+                <h3>Real-Time Tamping Feedback</h3>
+                <div class="tamping-data-block">
+                    <div class="tamping-item">
+                        <span class="tamping-label">ADC Value:</span>
+                        <span class="tamping-value">${adcValue}</span>
+                    </div>
+                    <div class="tamping-item">
+                        <span class="tamping-label">Calculated Level:</span>
+                        <span class="tamping-value">${index}</span>
+                    </div>
+                    <div class="tamping-item">
+                        <span class="tamping-label">Flavor Profile:</span>
+                        <span class="tamping-description-value">${description}</span>
+                    </div>
+                </div>
+                <hr>
+                <p>Select your desired tamping level below:</p>
+            `;
+      }
+
+      // --- Choice Rendering Function (UPDATED) ---
       function renderChoices(state, counter) {
         availableChoicesDiv.innerHTML = ""; // Clear previous content
 
@@ -583,6 +669,20 @@
           return;
         }
 
+        // NEW: Tamping State (State 3) requires special rendering
+        if (state === 3) {
+          if (latestTampingData) {
+            // Render the real-time ADC data block first
+            availableChoicesDiv.innerHTML += renderTampingData(
+              latestTampingData.adc_value
+            );
+          } else {
+            availableChoicesDiv.innerHTML +=
+              '<h3>Real-Time Tamping Feedback</h3><p style="font-style: italic; color: #7f8c8d;">Awaiting ADC data...</p><hr><p>Select your desired tamping level below:</p>';
+          }
+          // Do NOT return here, continue to render the selectable list below
+        }
+
         const map = SELECTION_MAPS[state];
         let choicesArray = [];
 
@@ -591,7 +691,7 @@
           choicesArray = map;
         } else if (typeof map === "string") {
           // Handle static states (8: Brewing, 9: Complete)
-          availableChoicesDiv.innerHTML = `<p style="font-style: italic; color: #7f8c8d; text-align: center;">${map}</p>`;
+          availableChoicesDiv.innerHTML += `<p style="font-style: italic; color: #7f8c8d; text-align: center;">${map}</p>`;
           return;
         } else {
           // Fallback for states with no definition
@@ -615,7 +715,7 @@
         availableChoicesDiv.appendChild(ul);
       }
 
-      // --- Summary Rendering Function (NEW) ---
+      // --- Summary Rendering Function ---
       function renderSummary(summaryData) {
         const menuName = SELECTION_MAPS[0][summaryData.menu_idx] || "N/A";
         const tempName = SELECTION_MAPS[1][summaryData.temp_idx] || "N/A";

@@ -5,6 +5,7 @@
 
 extern volatile uint8_t counter;
 extern volatile uint8_t current_state;
+extern volatile int8_t last_state;
 extern char stringOut[];
 
 extern volatile uint8_t bean_weights[];
@@ -25,8 +26,9 @@ extern volatile uint32_t last_led_blink_time;
 
 extern uint16_t water_level;
 extern uint16_t milk_level;
-extern uint8_t bean_humidity;
-extern uint8_t brewing_temp; 
+extern uint8_t bean_humidity; 
+extern uint8_t brewing_temp;
+
 
 #endif
 

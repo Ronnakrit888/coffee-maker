@@ -16,10 +16,10 @@ const server = http.createServer(app);
 
 // Setup Socket.IO Server with CORS
 const io = new Server(server, {
-  cors: {
-    origin: "*", // Allow all origins for local testing
-    methods: ["GET", "POST"]
-  }
+    cors: {
+        origin: "*", // Allow all origins for local testing
+        methods: ["GET", "POST"]
+    }
 });
 
 let serialPort = null;
@@ -29,7 +29,7 @@ let parser = null;
 function setupSerialPort() {
     console.log(`Attempting to connect to serial port: ${SERIAL_PORT}`);
     console.log(`Baud Rate: ${BAUD_RATE}`);
-    
+
     // Check if the port is already open
     if (serialPort && serialPort.isOpen) {
         serialPort.close();
@@ -37,10 +37,10 @@ function setupSerialPort() {
 
     try {
         serialPort = new SerialPort({ path: SERIAL_PORT, baudRate: BAUD_RATE });
-        
+
         // Use ReadlineParser to read data line by line (delimited by \n)
         parser = serialPort.pipe(new ReadlineParser({ delimiter: '\n' }));
-        
+
         serialPort.on('open', () => {
             console.log(`Successfully opened serial port ${SERIAL_PORT} at ${BAUD_RATE} baud.`);
         });
@@ -61,20 +61,26 @@ function setupSerialPort() {
         // --- Data Parsing Logic ---
         parser.on('data', (line) => {
             const rawLine = line.trim();
-            
+
             if (rawLine) {
                 console.log(`Received raw data: ${rawLine}`);
-                
+
+                // CRITICAL FIX: Define timestamp here so it's available to ALL try/catch blocks
+                const timestamp = Math.floor(Date.now() / 1000);
+
                 const startTag = "[DATASTART]";
                 const endTag = "[DATAEND]";
 
                 const startSummaryTag = "[SUMMARYSTART]";
                 const endSummaryTag = "[SUMMARYEND]";
 
+                const startTampingTag = "[TAMPINGSTART]";
+                const endTampingTag = "[TAMPINGEND]";
+
                 // NEW: Brewing Progress Tags
                 const startProgressTag = "[BREWINGPROGRESSSTART]";
                 const endProgressTag = "[BREWINGPROGRESSEND]";
-                
+
                 let dataString = '';
 
                 // 1. Parse Primary State Data
@@ -83,18 +89,18 @@ function setupSerialPort() {
                         const startIndex = rawLine.indexOf(startTag) + startTag.length;
                         const endIndex = rawLine.indexOf(endTag);
                         dataString = rawLine.substring(startIndex, endIndex).trim();
-                        
+
                         const values = dataString.split(',').map(v => parseInt(v.trim(), 10));
-                        
+
                         if (values.length === 3 && !values.some(isNaN)) {
                             const data = {
                                 "current_state": values[0],
                                 "counter": values[1],
                                 "safety_halt_released": values[2],
-                                "timestamp": Math.floor(Date.now() / 1000)
+                                "timestamp": timestamp // Use the shared timestamp
                             };
                             console.log(`[STATE] Data parsed and EMITTED:`, data);
-                            io.emit('stm32_update', data); 
+                            io.emit('stm32_update', data);
                         } else {
                             console.warn(`[STATE] Warning: Data string has invalid format or length. Raw: ${dataString}`);
                         }
@@ -103,7 +109,7 @@ function setupSerialPort() {
                         console.error(`[STATE] Error parsing data line: ${e}. Raw data: ${rawLine}`);
                     }
                 }
-                
+
                 // 2. Parse Summary Data
                 else if (rawLine.includes(startSummaryTag) && rawLine.includes(endSummaryTag)) {
                     try {
@@ -113,7 +119,7 @@ function setupSerialPort() {
 
                         // The summary has 7 indices: Menu, Temp, Bean, Tamping, Roast, Safety_Halt, Shots
                         const values = dataString.split(',').map(v => parseInt(v.trim(), 10));
-                        
+
                         if (values.length === 7 && !values.some(isNaN)) {
                             const summaryData = {
                                 "menu_idx": values[0],
@@ -121,14 +127,14 @@ function setupSerialPort() {
                                 "bean_idx": values[2],
                                 "tamping_idx": values[3],
                                 "roast_idx": values[4],
-                                "is_safety_idx" : values[5],
+                                "is_safety_idx": values[5],
                                 "shots": values[6], // This is the final shot count (1-indexed)
-                                "timestamp": Math.floor(Date.now() / 1000)
+                                "timestamp": timestamp // Use the shared timestamp
                             };
                             console.log(`[SUMMARY] Data parsed and EMITTED:`, summaryData);
-                            io.emit('stm32_summary', summaryData); 
+                            io.emit('stm32_summary', summaryData);
                         } else {
-                             console.warn(`[SUMMARY] Warning: Data string has invalid format or length. Raw: ${dataString}`);
+                            console.warn(`[SUMMARY] Warning: Data string has invalid format or length. Raw: ${dataString}`);
                         }
 
                     } catch (e) {
@@ -136,22 +142,54 @@ function setupSerialPort() {
                     }
                 }
 
-                // 3. UPDATED: Parse Brewing Progress Data (EXPECTS: step_id,step_percentage,global_percentage[,status])
+                // 3. Parse Tamping Log (FIXED: Now handles one number and two strings)
+                else if (rawLine.includes(startTampingTag) && rawLine.includes(endTampingTag)) {
+                    try {
+                        const startIndex = rawLine.indexOf(startTampingTag) + startTampingTag.length;
+                        const endIndex = rawLine.indexOf(endTampingTag);
+                        dataString = rawLine.substring(startIndex, endIndex).trim();
+
+                        // The STM32 sends: %d (e.g., "4095")
+                        const cleanData = dataString.trim();
+
+                        const adc_value = parseInt(cleanData, 10);
+
+                        if (!isNaN(adc_value) && cleanData.length > 0) {
+                            const tampingData = {
+                                "adc_value": adc_value,
+                                "timestamp": timestamp
+                            };
+
+                            // Emitting new structured data event
+                            io.emit('stm32_tamping_data', tampingData);
+                            console.log(`[TAMPING DATA] Parsed and Emitted ADC: ${adc_value}`);
+                        } else {
+                            // If it doesn't parse to a valid number
+                            console.warn(`[TAMPING DATA] Warning: Invalid ADC format. Raw: ${dataString}`);
+                            io.emit('log_message', { msg: `[Tamping Log - Corrupted] ${dataString}`, timestamp: timestamp });
+                        }
+                    } catch (e) {
+                        // The catch block can now safely access 'timestamp'
+                        console.error(`[TAMPING] Error parsing data line (Timestamp: ${timestamp}): ${e}. Raw data: ${rawLine}`);
+                    }
+                }
+
+                // 4. Parse Brewing Progress Data (EXPECTS: step_id,step_percentage,global_percentage[,status])
                 else if (rawLine.includes(startProgressTag) && rawLine.includes(endProgressTag)) {
                     try {
                         const startIndex = rawLine.indexOf(startProgressTag) + startProgressTag.length;
                         const endIndex = rawLine.indexOf(endProgressTag);
                         dataString = rawLine.substring(startIndex, endIndex).trim();
-                        
+
                         // Expected format: step_id, percentage, global_percentage [, FAIL]
                         const parts = dataString.split(',');
-                        
+
                         // Accept 3 or 4 parts
                         if (parts.length >= 3 && parts.length <= 4) {
                             const currentStepId = parts[0].trim();
                             const percentage = parseInt(parts[1].trim(), 10);
                             const globalPercentage = parseInt(parts[2].trim(), 10);
-                            
+
                             // Check for optional 4th part 'FAIL'
                             const isFailure = parts.length === 4 && parts[3].trim() === 'FAIL';
 
@@ -159,14 +197,14 @@ function setupSerialPort() {
                                 const progressData = {
                                     current_step_id: currentStepId,
                                     // Send 0% on failure, otherwise use the reported percentage
-                                    percentage: isFailure ? 0 : percentage, 
+                                    percentage: isFailure ? 0 : percentage,
                                     global_percentage: globalPercentage,
                                     // Set status based on failure flag or 100% completion
                                     status: isFailure ? 'FAIL' : (percentage === 100 ? 'SUCCESS' : 'IN_PROGRESS'),
-                                    timestamp: Math.floor(Date.now() / 1000)
+                                    timestamp: timestamp // Use the shared timestamp
                                 };
                                 console.log(`[PROGRESS] Data parsed and EMITTED:`, progressData);
-                                io.emit('brewing_progress', progressData); 
+                                io.emit('brewing_progress', progressData);
                             } else {
                                 console.warn(`[PROGRESS] Warning: Percentage values are invalid numbers and status is not FAIL. Raw: ${dataString}`);
                             }
@@ -178,10 +216,10 @@ function setupSerialPort() {
                         console.error(`[PROGRESS] Error parsing data line: ${e}. Raw data: ${rawLine}`);
                     }
                 }
-                
-                // 4. Emit raw log messages
+
+                // 5. Emit raw log messages
                 else {
-                    io.emit('log_message', { msg: rawLine });
+                    io.emit('log_message', { msg: rawLine, timestamp: timestamp }); // Also add timestamp here
                 }
             }
         });
@@ -198,9 +236,10 @@ setupSerialPort();
 
 // Serve a basic message on the root
 app.get('/', (req, res) => {
-  res.send('STM32 Node.js WebSocket Server Running');
+    res.send('STM32 Node.js WebSocket Server Running');
 });
 
 // Start the HTTP server
 server.listen(SERVER_PORT, '0.0.0.0', () => {
-    console.log(`Starting Node.js WebSocket server on http://127.0.0.1:${SERVER_PORT}`);});
+    console.log(`Starting Node.js WebSocket server on http://127.0.0.1:${SERVER_PORT}`);
+});
