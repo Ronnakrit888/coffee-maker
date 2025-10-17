@@ -38,7 +38,7 @@ volatile uint8_t last_state = 99;
 
 char stringOut[128];
 
-volatile uint8_t bean_weights[MAX_BEAN_TYPES] = {100, 100, 100, 100, 100, 100};
+volatile uint8_t bean_weights[MAX_BEAN_TYPES] = {5, 100, 100, 100, 100, 100};
 
 // Temperature
 
