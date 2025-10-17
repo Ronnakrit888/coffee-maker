@@ -34,6 +34,7 @@ const char *state_names[MAX_STATE_NAME] = {
 
 volatile uint8_t counter = 0;
 volatile uint8_t current_state = 0;
+volatile int8_t last_state = -1;
 
 char stringOut[128];
 
